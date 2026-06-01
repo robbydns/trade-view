@@ -1,0 +1,56 @@
+
+> crypto-meme-coin-scanner@0.1.0 dev
+> concurrently "npm:dev:frontend" "npm:dev:server"
+
+[dev:frontend] 
+[dev:frontend] > crypto-meme-coin-scanner@0.1.0 dev:frontend
+[dev:frontend] > vite
+[dev:frontend] 
+[dev:server] 
+[dev:server] > crypto-meme-coin-scanner@0.1.0 dev:server
+[dev:server] > tsx watch server/index.ts
+[dev:server] 
+[dev:frontend] X [ERROR] Cannot read directory "..": Access is denied.
+[dev:frontend] 
+[dev:frontend] X [ERROR] Could not resolve "C:\\Users\\ASUS\\Trad-view\\vite.config.ts"
+[dev:frontend] 
+[dev:frontend] [31mfailed to load config from C:\Users\ASUS\Trad-view\vite.config.ts[39m
+[dev:frontend] [31merror when starting dev server:
+[dev:frontend] Error: Build failed with 2 errors:
+[dev:frontend] error: Cannot read directory "..": Access is denied.
+[dev:frontend] error: Could not resolve "C:\\Users\\ASUS\\Trad-view\\vite.config.ts"
+[dev:frontend]     at failureErrorWithLog (C:\Users\ASUS\Trad-view\node_modules\esbuild\lib\main.js:1472:15)
+[dev:frontend]     at C:\Users\ASUS\Trad-view\node_modules\esbuild\lib\main.js:945:25
+[dev:frontend]     at runOnEndCallbacks (C:\Users\ASUS\Trad-view\node_modules\esbuild\lib\main.js:1315:45)
+[dev:frontend]     at buildResponseToResult (C:\Users\ASUS\Trad-view\node_modules\esbuild\lib\main.js:943:7)
+[dev:frontend]     at C:\Users\ASUS\Trad-view\node_modules\esbuild\lib\main.js:970:16
+[dev:frontend]     at responseCallbacks.<computed> (C:\Users\ASUS\Trad-view\node_modules\esbuild\lib\main.js:622:9)
+[dev:frontend]     at handleIncomingPacket (C:\Users\ASUS\Trad-view\node_modules\esbuild\lib\main.js:677:12)
+[dev:frontend]     at Socket.readFromStdout (C:\Users\ASUS\Trad-view\node_modules\esbuild\lib\main.js:600:7)
+[dev:frontend]     at Socket.emit (node:events:518:28)
+[dev:frontend]     at addChunk (node:internal/streams/readable:561:12)[39m
+[dev:frontend] npm run dev:frontend exited with code 1
+[dev:server] [Indodax] Connection error: 
+[dev:server] [Scheduler] Loaded 0 tickers from Indodax
+[dev:server] node:events:496
+[dev:server]       throw er; // Unhandled 'error' event
+[dev:server]       ^
+[dev:server] 
+[dev:server] Error: listen EADDRINUSE: address already in use :::4000
+[dev:server]     at Server.setupListenHandle [as _listen2] (node:net:1939:16)
+[dev:server]     at listenInCluster (node:net:1996:12)
+[dev:server]     at Server.listen (node:net:2101:7)
+[dev:server]     at Function.listen (C:\Users\ASUS\Trad-view\node_modules\express\lib\application.js:635:24)
+[dev:server]     at startServer (C:\Users\ASUS\Trad-view\server\index.ts:30:9)
+[dev:server]     at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[dev:server] Emitted 'error' event on Server instance at:
+[dev:server]     at emitErrorNT (node:net:1975:8)
+[dev:server]     at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+[dev:server]   code: 'EADDRINUSE',
+[dev:server]   errno: -4091,
+[dev:server]   syscall: 'listen',
+[dev:server]   address: '::',
+[dev:server]   port: 4000
+[dev:server] }
+[dev:server] 
+[dev:server] Node.js v22.15.1

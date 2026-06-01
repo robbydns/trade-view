@@ -1,0 +1,44 @@
+import fs from 'fs'
+import { DebugState, ScannerSettings, SignalHistoryRecord, SnapshotRecord, TelegramLogRecord } from './models.js'
+
+type StoreData = {
+  signalHistory: SignalHistoryRecord[]
+  telegramLogs: TelegramLogRecord[]
+  snapshots: SnapshotRecord[]
+  settings: ScannerSettings
+  debug: DebugState
+}
+
+const storeFile = new URL('./store.json', import.meta.url)
+const defaults: StoreData = {
+  signalHistory: [],
+  telegramLogs: [],
+  snapshots: [],
+  settings: { includeNewListings: true, includeLowMarketCapCoins: true, includeMemeCoins: true },
+  debug: { lastScanTime: null, coinsScanned: 0, coinsQualified: 0, alertsSentToday: 0, lastAlertCoin: null, lastAlertTime: null, lastTelegramResponse: null, lastTelegramError: null }
+}
+
+const load = (): StoreData => {
+  try {
+    return { ...defaults, ...JSON.parse(fs.readFileSync(storeFile, 'utf8')) }
+  } catch {
+    return structuredClone(defaults)
+  }
+}
+
+let data = load()
+const save = () => fs.writeFileSync(storeFile, JSON.stringify(data, null, 2))
+
+export const store = {
+  get: () => data,
+  mutate: (change: (draft: StoreData) => void) => { change(data); save() },
+  addSignal: (record: SignalHistoryRecord) => store.mutate((draft) => { draft.signalHistory.unshift(record); draft.signalHistory = draft.signalHistory.slice(0, 2000) }),
+  addTelegramLog: (record: TelegramLogRecord) => store.mutate((draft) => { draft.telegramLogs.unshift(record); draft.telegramLogs = draft.telegramLogs.slice(0, 2000) }),
+  addSnapshots: (records: SnapshotRecord[]) => store.mutate((draft) => {
+    draft.snapshots.push(...records)
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+    draft.snapshots = draft.snapshots.filter((record) => Date.parse(record.timestamp) >= cutoff)
+  }),
+  updateSettings: (settings: Partial<ScannerSettings>) => store.mutate((draft) => { draft.settings = { ...draft.settings, ...settings } }),
+  updateDebug: (debug: Partial<DebugState>) => store.mutate((draft) => { draft.debug = { ...draft.debug, ...debug } })
+}

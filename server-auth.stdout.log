@@ -1,0 +1,7 @@
+
+> crypto-meme-coin-scanner@0.1.0 dev:server
+> tsx watch server/index.ts
+
+Server berjalan di http://localhost:4000
+6:45:37 PM [tsx] change in ./server\alert.ts Restarting...
+c

@@ -1,0 +1,12 @@
+[2m3:37:07 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/scan[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1139:18)
+    at afterConnectMultiple (node:net:1714:7)
+[2m3:38:07 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/scan[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1139:18)
+    at afterConnectMultiple (node:net:1714:7)
+[2m4:26:26 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/scan[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1139:18)
+    at afterConnectMultiple (node:net:1714:7)
