@@ -34,6 +34,7 @@ const CACHE_MS = Math.min(30000, Math.max(15000, Number(process.env.BINANCE_CACH
 const TIMEOUT_MS = 10000
 const FUTURES_URL = process.env.BINANCE_FUTURES_URL || 'https://fapi.binance.com'
 const MEME_SYMBOLS = new Set(['DOGEUSDT', 'SHIBUSDT', 'PEPEUSDT', 'FLOKIUSDT', 'WIFUSDT', 'BONKUSDT', 'MEMEUSDT', 'NEIROUSDT'])
+const CHART_INTERVALS = new Set(['15m', '1h', '4h', '1d'])
 
 const toNumber = (value: unknown) => Number(value) || 0
 const round = (value: number, digits = 8) => Number(value.toFixed(digits))
@@ -174,6 +175,17 @@ export class BinanceRealtimeService {
   async getCoin(symbol: string) {
     const ticker = this.tickerMap.get(symbol.toUpperCase())
     return ticker ? this.analyzeTicker(ticker, true) : null
+  }
+
+  async getKlines(symbol: string, interval: string, limit = 200) {
+    const normalizedSymbol = symbol.toUpperCase()
+    if (!CHART_INTERVALS.has(interval)) throw new Error('Timeframe chart tidak valid.')
+    if (!this.tradingSymbols.has(normalizedSymbol)) throw new Error('Pair USDT tidak ditemukan atau tidak aktif di Binance.')
+    const normalizedLimit = Math.min(500, Math.max(50, limit))
+    const response = await this.request('/api/v3/klines', { symbol: normalizedSymbol, interval, limit: normalizedLimit })
+    const candles = Array.isArray(response.data) ? (response.data as unknown[][]).map(parseCandle) : []
+    if (!candles.length) throw new Error('Binance tidak mengembalikan candle untuk chart.')
+    return candles
   }
 
   private connectWebSocket() {

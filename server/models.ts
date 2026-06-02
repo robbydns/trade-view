@@ -118,6 +118,35 @@ export interface TelegramSettings {
   enabled: boolean
 }
 
+export interface PositionRecord {
+  id: string
+  symbol: string
+  quantity: number
+  totalCostUsdt: number
+  averageEntryPrice: number
+  maxLossPct: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type PositionDecision = 'PERTIMBANGKAN HOLD' | 'PANTAU KETAT' | 'TINJAU BATAS RISIKO' | 'DATA TIDAK TERSEDIA'
+
+export interface PositionEvaluation extends PositionRecord {
+  currentPrice: number | null
+  currentValueUsdt: number | null
+  pnlUsdt: number | null
+  pnlPct: number | null
+  decision: PositionDecision
+  reasons: string[]
+  technicalStopLoss: number | null
+  support1: number | null
+  takeProfit1: number | null
+  takeProfit2: number | null
+  signal: SignalLabel | null
+  score: number | null
+  estimatedUpsideHighPct: number | null
+}
+
 export interface ScanResponse {
   status: ConnectionStatus
   lastUpdated: string | null

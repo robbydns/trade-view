@@ -1,4 +1,4 @@
-import { DebugState, MarketTicker, ScannerSettings, ScanResponse, SignalHistoryRecord, TelegramLogRecord, TelegramSettings } from '../types'
+import { Candle, DebugState, MarketTicker, PositionEvaluation, PositionRecord, ScannerSettings, ScanResponse, SignalHistoryRecord, TelegramLogRecord, TelegramSettings, TwentyPercentCandidate } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 const AUTH_TOKEN_KEY = 'crypto-signal-compass-auth-token'
@@ -29,6 +29,7 @@ export const login = (email: string, password: string) => request<{ token: strin
 export const fetchSession = () => request<{ authenticated: boolean }>('/auth/session')
 export const fetchScan = () => request<ScanResponse>('/scan')
 export const fetchCoin = (symbol: string) => request<{ ticker: MarketTicker; history: MarketTicker[]; idrRate: number | null; idrRateUpdatedAt: string | null; idrRateSource: 'CoinGecko' | null }>(`/coins/${symbol}`)
+export const fetchCoinKlines = (symbol: string, interval: '15m' | '1h' | '4h' | '1d', limit = 200) => request<{ symbol: string; interval: string; candles: Candle[] }>(`/coins/${symbol}/klines?interval=${interval}&limit=${limit}`)
 export const fetchWatchlist = () => request<{ symbols: string[] }>('/watchlist')
 export const addWatchlist = (symbol: string) => request<{ symbols: string[] }>('/watchlist', {
   method: 'POST',
@@ -51,3 +52,7 @@ export const fetchAnalytics = () => request<{ topAlertWinners: SignalHistoryReco
 export const fetchEarlyPumpAnalysis = () => request<{ records: Array<{ symbol: string; gain24h: number; snapshots: Array<{ timestamp: string; price: number; volume: number; volSpike: number; relVol: number; rsi: number; openInterest: number | null }> }> }>('/early-pump-analysis')
 export const fetchScannerSettings = () => request<ScannerSettings>('/scanner/settings')
 export const updateScannerSettings = (settings: ScannerSettings) => request<ScannerSettings>('/scanner/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
+export const fetchTwentyPercentRadar = () => request<{ updatedAt: string; records: TwentyPercentCandidate[] }>('/twenty-percent-radar')
+export const fetchPortfolio = () => request<{ records: PositionEvaluation[] }>('/portfolio')
+export const savePosition = (position: { symbol: string; quantity: number; totalCostUsdt: number; maxLossPct: number }) => request<PositionRecord>('/portfolio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(position) })
+export const deletePosition = (symbol: string) => request<{ success: boolean }>(`/portfolio/${symbol}`, { method: 'DELETE' })

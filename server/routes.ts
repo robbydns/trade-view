@@ -1,5 +1,5 @@
 import express from 'express'
-import { addWatchlist, getAnalytics, getCoin, getDebug, getEarlyPumpAnalysis, getMissedOpportunities, getPersistentSignalHistory, getScanResponse, getScannerSettings, getSignalHistory, getTelegramLogs, getWatchlist, logTelegramTest, removeWatchlist, updateScannerSettings } from './scheduler.js'
+import { addWatchlist, getAnalytics, getCoin, getCoinKlines, getDebug, getEarlyPumpAnalysis, getMissedOpportunities, getPersistentSignalHistory, getPortfolio, getScanResponse, getScannerSettings, getSignalHistory, getTelegramLogs, getTwentyPercentRadar, getWatchlist, logTelegramTest, removePosition, removeWatchlist, updateScannerSettings, upsertPosition } from './scheduler.js'
 import { getTelegramSettings, testTelegramAlert, updateTelegramSettings } from './alert.js'
 import { createSessionToken, credentialsAreValid, requireAuth } from './auth.js'
 
@@ -44,6 +44,16 @@ router.get('/coins/:symbol', async (req, res) => {
   }
   const scan = getScanResponse()
   res.json({ ticker, history: getSignalHistory(req.params.symbol), idrRate: scan.idrRate, idrRateUpdatedAt: scan.idrRateUpdatedAt, idrRateSource: scan.idrRateSource })
+})
+
+router.get('/coins/:symbol/klines', async (req, res) => {
+  try {
+    const interval = String(req.query.interval || '1h')
+    const limit = Number(req.query.limit || 200)
+    res.json({ symbol: req.params.symbol.toUpperCase(), interval, candles: await getCoinKlines(req.params.symbol, interval, limit) })
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message })
+  }
 })
 
 router.get('/watchlist', (_req, res) => {
@@ -91,6 +101,19 @@ router.get('/debug', (_req, res) => res.json(getDebug()))
 router.get('/missed-opportunities', (_req, res) => res.json({ records: getMissedOpportunities() }))
 router.get('/early-pump-analysis', (_req, res) => res.json({ records: getEarlyPumpAnalysis() }))
 router.get('/analytics', (_req, res) => res.json(getAnalytics()))
+router.get('/twenty-percent-radar', async (_req, res) => res.json(await getTwentyPercentRadar()))
+router.get('/portfolio', async (_req, res) => res.json({ records: await getPortfolio() }))
+router.post('/portfolio', (req, res) => {
+  try {
+    res.json(upsertPosition(req.body))
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message })
+  }
+})
+router.delete('/portfolio/:symbol', (req, res) => {
+  removePosition(req.params.symbol)
+  res.json({ success: true })
+})
 router.get('/scanner/settings', (_req, res) => res.json(getScannerSettings()))
 router.put('/scanner/settings', (req, res) => res.json(updateScannerSettings(req.body)))
 

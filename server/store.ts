@@ -1,5 +1,5 @@
 import fs from 'fs'
-import { DebugState, ScannerSettings, SignalHistoryRecord, SnapshotRecord, TelegramLogRecord } from './models.js'
+import { DebugState, PositionRecord, ScannerSettings, SignalHistoryRecord, SnapshotRecord, TelegramLogRecord } from './models.js'
 
 type StoreData = {
   signalHistory: SignalHistoryRecord[]
@@ -7,6 +7,7 @@ type StoreData = {
   snapshots: SnapshotRecord[]
   settings: ScannerSettings
   debug: DebugState
+  positions: PositionRecord[]
 }
 
 const storeFile = new URL('./store.json', import.meta.url)
@@ -15,7 +16,8 @@ const defaults: StoreData = {
   telegramLogs: [],
   snapshots: [],
   settings: { includeNewListings: true, includeLowMarketCapCoins: true, includeMemeCoins: true },
-  debug: { lastScanTime: null, coinsScanned: 0, coinsQualified: 0, alertsSentToday: 0, lastAlertCoin: null, lastAlertTime: null, lastTelegramResponse: null, lastTelegramError: null }
+  debug: { lastScanTime: null, coinsScanned: 0, coinsQualified: 0, alertsSentToday: 0, lastAlertCoin: null, lastAlertTime: null, lastTelegramResponse: null, lastTelegramError: null },
+  positions: []
 }
 
 const load = (): StoreData => {
@@ -40,5 +42,11 @@ export const store = {
     draft.snapshots = draft.snapshots.filter((record) => Date.parse(record.timestamp) >= cutoff)
   }),
   updateSettings: (settings: Partial<ScannerSettings>) => store.mutate((draft) => { draft.settings = { ...draft.settings, ...settings } }),
-  updateDebug: (debug: Partial<DebugState>) => store.mutate((draft) => { draft.debug = { ...draft.debug, ...debug } })
+  updateDebug: (debug: Partial<DebugState>) => store.mutate((draft) => { draft.debug = { ...draft.debug, ...debug } }),
+  upsertPosition: (record: PositionRecord) => store.mutate((draft) => {
+    const index = draft.positions.findIndex((item) => item.symbol === record.symbol)
+    if (index >= 0) draft.positions[index] = record
+    else draft.positions.unshift(record)
+  }),
+  removePosition: (symbol: string) => store.mutate((draft) => { draft.positions = draft.positions.filter((item) => item.symbol !== symbol) })
 }

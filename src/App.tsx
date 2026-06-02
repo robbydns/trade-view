@@ -6,12 +6,14 @@ import CoinDetail from './pages/CoinDetail'
 import Education from './pages/Education'
 import Login from './pages/Login'
 import Overview from './pages/Overview'
+import Portfolio from './pages/Portfolio'
 import SignalHistory from './pages/SignalHistory'
 import TelegramLog from './pages/TelegramLog'
+import TwentyPercentRadar from './pages/TwentyPercentRadar'
 import Watchlist from './pages/Watchlist'
 import { clearAuthToken, fetchSession, getAuthToken } from './services/api'
 
-const links = [['Scanner', '/'], ['Signal History', '/signal-history'], ['Telegram Log', '/telegram-log'], ['Analytics', '/analytics'], ['Watchlist', '/watchlist'], ['Telegram', '/telegram'], ['Edukasi', '/education']]
+const links = [['Scanner', '/'], ['20% Radar', '/twenty-percent-radar'], ['Portfolio', '/portfolio'], ['Signal History', '/signal-history'], ['Telegram Log', '/telegram-log'], ['Analytics', '/analytics'], ['Watchlist', '/watchlist'], ['Telegram', '/telegram'], ['Edukasi', '/education']]
 
 const App = () => {
   const [authenticated, setAuthenticated] = useState(Boolean(getAuthToken()))
@@ -60,6 +62,8 @@ const App = () => {
           <Route path="/signal-history" element={<SignalHistory />} />
           <Route path="/telegram-log" element={<TelegramLog />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/twenty-percent-radar" element={<TwentyPercentRadar />} />
+          <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/watchlist" element={<Watchlist />} />
           <Route path="/telegram" element={<Alerts />} />
           <Route path="/education" element={<Education />} />

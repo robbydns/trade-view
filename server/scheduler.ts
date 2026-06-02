@@ -1,9 +1,10 @@
 import fs from 'fs'
 import { BinanceRealtimeService } from './binance.js'
-import { HistoryStatus, MarketTicker, ScanResponse, SignalHistoryRecord, SnapshotRecord, TelegramLogRecord } from './models.js'
+import { HistoryStatus, MarketTicker, PositionEvaluation, PositionRecord, ScanResponse, SignalHistoryRecord, SnapshotRecord, TelegramLogRecord } from './models.js'
 import { sendTelegramAlert } from './alert.js'
 import { getIdrRate } from './rates.js'
 import { store } from './store.js'
+import { buildTwentyPercentRadar } from './social.js'
 
 const binance = new BinanceRealtimeService()
 const cooldownBySymbol = new Map<string, number>()
@@ -136,6 +137,7 @@ const saveWatchlist = () => fs.writeFileSync(watchlistFile, JSON.stringify([...w
 export const addWatchlist = (symbol: string) => { watchlist.add(normalizeSymbol(symbol)); saveWatchlist() }
 export const removeWatchlist = (symbol: string) => { watchlist.delete(normalizeSymbol(symbol)); saveWatchlist() }
 export const getCoin = async (symbol: string) => binance.getCoin(normalizeSymbol(symbol))
+export const getCoinKlines = async (symbol: string, interval: string, limit = 200) => binance.getKlines(normalizeSymbol(symbol), interval, limit)
 export const getSignalHistory = (symbol: string) => signalHistory.get(normalizeSymbol(symbol)) || []
 export const getPersistentSignalHistory = () => store.get().signalHistory
 export const getTelegramLogs = () => store.get().telegramLogs
@@ -154,6 +156,52 @@ export const getAnalytics = () => {
   const accuracy = history.length ? Number(((history.filter((item) => item.gainLossPct > 0).length / history.length) * 100).toFixed(2)) : 0
   return { topAlertWinners: winners, topMissedPumps: getMissedOpportunities().slice(0, 10), averageAlertAccuracy: accuracy, averageProfitAfterAlert: averageProfit, bestPerformingIndicators: winners.slice(0, 5).map((item) => ({ symbol: item.symbol, rsi: item.rsi, volSpike: item.volSpike, relVol: item.relVol, gainLossPct: item.gainLossPct })) }
 }
+export const getTwentyPercentRadar = () => buildTwentyPercentRadar(response.tickers)
+const evaluatePosition = async (position: PositionRecord): Promise<PositionEvaluation> => {
+  const ticker = await getCoin(position.symbol)
+  if (!ticker) return { ...position, currentPrice: null, currentValueUsdt: null, pnlUsdt: null, pnlPct: null, decision: 'DATA TIDAK TERSEDIA', reasons: ['Data Binance coin tidak tersedia. Evaluasi sengaja dikosongkan.'], technicalStopLoss: null, support1: null, takeProfit1: null, takeProfit2: null, signal: null, score: null, estimatedUpsideHighPct: null }
+  const currentValueUsdt = Number((position.quantity * ticker.price).toFixed(8))
+  const pnlUsdt = Number((currentValueUsdt - position.totalCostUsdt).toFixed(8))
+  const pnlPct = pct(currentValueUsdt, position.totalCostUsdt)
+  const reasons: string[] = []
+  const belowPersonalRisk = pnlPct <= -position.maxLossPct
+  const belowTechnicalStop = ticker.price <= ticker.entry.stopLoss
+  let decision: PositionEvaluation['decision'] = 'PANTAU KETAT'
+
+  if (belowPersonalRisk || belowTechnicalStop) {
+    decision = 'TINJAU BATAS RISIKO'
+    if (belowPersonalRisk) reasons.push(`P/L ${pnlPct}% melewati batas rugi pribadi -${position.maxLossPct}%`)
+    if (belowTechnicalStop) reasons.push('Harga berada di bawah level invalidasi teknikal')
+  } else if (ticker.isOverheated || ticker.rsi15m > 72 || ticker.price < ticker.support1) {
+    decision = 'PANTAU KETAT'
+    if (ticker.isOverheated) reasons.push('Signal berubah menjadi OVERHEATED')
+    if (ticker.rsi15m > 72) reasons.push(`RSI 15m tinggi di ${ticker.rsi15m}`)
+    if (ticker.price < ticker.support1) reasons.push('Harga berada di bawah support 1')
+  } else if (ticker.score >= 55 && ticker.price >= ticker.support1 && ticker.ma10 >= ticker.ma30) {
+    decision = 'PERTIMBANGKAN HOLD'
+    reasons.push('Harga masih bertahan di atas support 1')
+    reasons.push('MA10 masih berada di atas atau setara MA30')
+    reasons.push(`Score teknikal ${ticker.score}`)
+  } else {
+    reasons.push('Momentum belum cukup kuat untuk status hold')
+  }
+
+  return { ...position, currentPrice: ticker.price, currentValueUsdt, pnlUsdt, pnlPct, decision, reasons, technicalStopLoss: ticker.entry.stopLoss, support1: ticker.support1, takeProfit1: ticker.entry.takeProfit1, takeProfit2: ticker.entry.takeProfit2, signal: ticker.signal, score: ticker.score, estimatedUpsideHighPct: ticker.estimatedUpsideHighPct }
+}
+export const getPortfolio = async () => Promise.all(store.get().positions.map(evaluatePosition))
+export const upsertPosition = (input: { symbol: string; quantity: number; totalCostUsdt: number; maxLossPct?: number }) => {
+  const symbol = normalizeSymbol(input.symbol)
+  const quantity = Number(input.quantity)
+  const totalCostUsdt = Number(input.totalCostUsdt)
+  const maxLossPct = Number(input.maxLossPct ?? 5)
+  if (!symbol || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(totalCostUsdt) || totalCostUsdt <= 0 || !Number.isFinite(maxLossPct) || maxLossPct <= 0 || maxLossPct > 100) throw new Error('Jumlah coin, total modal, dan batas rugi wajib diisi dengan angka valid.')
+  const existing = store.get().positions.find((item) => item.symbol === symbol)
+  const now = new Date().toISOString()
+  const record: PositionRecord = { id: existing?.id || id(), symbol, quantity, totalCostUsdt, averageEntryPrice: Number((totalCostUsdt / quantity).toFixed(8)), maxLossPct, createdAt: existing?.createdAt || now, updatedAt: now }
+  store.upsertPosition(record)
+  return record
+}
+export const removePosition = (symbol: string) => store.removePosition(normalizeSymbol(symbol))
 export const logTelegramTest = (status: TelegramLogRecord['status'], message: string) => {
   store.addTelegramLog({ id: id(), timestamp: new Date().toISOString(), symbol: 'TEST', score: 0, signal: 'TEST', status, response: message })
   store.updateDebug(status === 'SENT' ? { lastTelegramResponse: message, lastTelegramError: null } : { lastTelegramError: message })

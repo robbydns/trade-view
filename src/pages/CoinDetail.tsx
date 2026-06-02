@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { addWatchlist, fetchCoin } from '../services/api'
-import { Candle, MarketTicker } from '../types'
+import { addWatchlist, fetchCoin, savePosition } from '../services/api'
+import { MarketTicker } from '../types'
 import SignalBadge from '../components/SignalBadge'
+import TradingAnalysisChart from '../components/TradingAnalysisChart'
 
 const value = (number: number) => number < 1 ? number.toFixed(8) : number.toLocaleString('id-ID', { maximumFractionDigits: 4 })
 const rupiah = (number: number, idrRate: number | null) => idrRate ? `Rp${(number * idrRate).toLocaleString('id-ID', { maximumFractionDigits: 2 })}` : 'Rp N/A'
@@ -36,45 +37,15 @@ const ZoneRow = ({ label, low, high, idrRate }: { label: string; low: number; hi
   </div>
 )
 
-const CandlestickChart = ({ candles }: { candles: Candle[] }) => {
-  const visible = candles.slice(-80)
-  const width = 1200
-  const height = 360
-  const padding = 22
-  const min = Math.min(...visible.map((candle) => candle.low))
-  const max = Math.max(...visible.map((candle) => candle.high))
-  const range = Math.max(max - min, 0.00000001)
-  const slot = (width - padding * 2) / Math.max(visible.length, 1)
-  const bodyWidth = Math.max(2.5, Math.min(slot * 0.62, 10))
-  const y = (price: number) => padding + ((max - price) / range) * (height - padding * 2)
-
-  if (!visible.length) return <div className="grid h-64 place-items-center text-sm text-slate-500">Candle Binance belum tersedia.</div>
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-[260px] w-full sm:h-[360px]" preserveAspectRatio="none" role="img" aria-label="Chart candle 15 menit Binance">
-      {[0.25, 0.5, 0.75].map((part) => <line key={part} x1="0" x2={width} y1={height * part} y2={height * part} stroke="rgba(148,163,184,0.10)" />)}
-      {visible.map((candle, index) => {
-        const x = padding + index * slot + slot / 2
-        const openY = y(candle.open)
-        const closeY = y(candle.close)
-        const color = candle.close >= candle.open ? '#34d399' : '#fb7185'
-        return (
-          <g key={`${candle.openTime}-${index}`}>
-            <line x1={x} x2={x} y1={y(candle.high)} y2={y(candle.low)} stroke={color} strokeWidth="1.5" />
-            <rect x={x - bodyWidth / 2} y={Math.min(openY, closeY)} width={bodyWidth} height={Math.max(Math.abs(openY - closeY), 2)} fill={color} />
-          </g>
-        )
-      })}
-    </svg>
-  )
-}
-
 const CoinDetail = () => {
   const { symbol = '' } = useParams()
   const [ticker, setTicker] = useState<MarketTicker | null>(null)
   const [idrRate, setIdrRate] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [quantity, setQuantity] = useState('')
+  const [totalCostUsdt, setTotalCostUsdt] = useState('')
+  const [maxLossPct, setMaxLossPct] = useState('5')
 
   useEffect(() => {
     let active = true
@@ -96,8 +67,6 @@ const CoinDetail = () => {
     }
   }, [symbol])
 
-  const lastUpdated = useMemo(() => ticker ? new Date(ticker.updatedAt).toLocaleTimeString('id-ID') : '', [ticker])
-
   const saveWatchlist = async () => {
     if (!ticker) return
     try {
@@ -105,6 +74,16 @@ const CoinDetail = () => {
       setMessage(`${ticker.symbol} ditambahkan ke watchlist.`)
     } catch (err) {
       setMessage((err as Error).message)
+    }
+  }
+
+  const saveTradePosition = async () => {
+    if (!ticker) return
+    try {
+      await savePosition({ symbol: ticker.symbol, quantity: Number(quantity), totalCostUsdt: Number(totalCostUsdt), maxLossPct: Number(maxLossPct) })
+      setMessage(`Posisi ${ticker.symbol} tersimpan. Pantau evaluasinya melalui menu Portfolio.`)
+    } catch (err) {
+      setMessage(`ERROR: ${(err as Error).message}`)
     }
   }
 
@@ -140,13 +119,7 @@ const CoinDetail = () => {
       <Metric label="Score" className={ticker.score >= 65 ? 'text-emerald-300' : ticker.score >= 50 ? 'text-amber-300' : 'text-slate-200'}>{ticker.score}</Metric>
     </section>
 
-    <section className="overflow-hidden rounded-md border border-white/10 bg-slate-900/60">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2 text-xs text-slate-400">
-        <span>Candle 15m ({Math.min(ticker.candles.length, 80)} terakhir)</span>
-        <span>Binance real-time &middot; update {lastUpdated}</span>
-      </div>
-      <CandlestickChart candles={ticker.candles} />
-    </section>
+    <TradingAnalysisChart symbol={ticker.symbol} />
 
     <section className="grid gap-3 lg:grid-cols-2">
       <div className="rounded-md border border-white/10 bg-slate-900/60 p-3 text-xs sm:text-sm">
@@ -171,6 +144,23 @@ const CoinDetail = () => {
           <PriceRow label="Stop Loss" price={ticker.entry.stopLoss} idrRate={idrRate} className="text-rose-300" />
         </div>
       </div>
+    </section>
+
+    <section className="rounded-md border border-cyan-400/20 bg-slate-900/60 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="font-semibold text-white">Catat Posisi Trading</h2>
+          <p className="mt-1 text-xs text-slate-400">Simpan jumlah coin dan total modal agar Portfolio dapat menghitung P/L serta menampilkan pertimbangan risiko.</p>
+        </div>
+        <Link to="/portfolio" className="rounded-md border border-cyan-400/30 px-3 py-2 text-xs text-cyan-200">Buka Portfolio</Link>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <label className="text-xs text-slate-400">Jumlah coin<input type="number" min="0" step="any" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="Contoh: 1000" className="mt-1 w-full rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" /></label>
+        <label className="text-xs text-slate-400">Total modal USDT<input type="number" min="0" step="any" value={totalCostUsdt} onChange={(event) => setTotalCostUsdt(event.target.value)} placeholder="Contoh: 50" className="mt-1 w-full rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" /></label>
+        <label className="text-xs text-slate-400">Batas rugi pribadi %<input type="number" min="0.1" max="100" step="0.1" value={maxLossPct} onChange={(event) => setMaxLossPct(event.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" /></label>
+        <div className="flex items-end"><button type="button" onClick={saveTradePosition} className="w-full rounded-md bg-cyan-500 px-3 py-2 text-sm font-semibold text-slate-950">Simpan Posisi</button></div>
+      </div>
+      <div className="mt-2 text-xs text-slate-500">Average entry preview: {Number(quantity) > 0 && Number(totalCostUsdt) > 0 ? `${value(Number(totalCostUsdt) / Number(quantity))} USDT` : '-'}</div>
     </section>
 
     <section className="rounded-md border border-white/10 bg-slate-900/60 p-3">

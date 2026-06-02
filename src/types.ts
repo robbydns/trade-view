@@ -119,3 +119,96 @@ export interface TelegramSettings {
   enabled: boolean
   hasBotToken?: boolean
 }
+
+export interface SocialInsight {
+  symbol: string
+  redditMentions24h: number | null
+  redditEngagement: number | null
+  xPosts7d: number | null
+  xRecentSampleSize: number | null
+  xEngagement: number | null
+  xSentimentScore: number | null
+  xSentimentLabel: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE' | 'UNAVAILABLE'
+  sentimentScore: number | null
+  sentimentLabel: 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE' | 'UNAVAILABLE'
+  coinGeckoTrendingRank: number | null
+  sources: string[]
+  updatedAt: string
+  error: string | null
+}
+
+export interface TwentyPercentCandidate {
+  symbol: string
+  price: number
+  signal: SignalLabel
+  score: number
+  priceChange15m: number
+  priceChange1h: number
+  priceChange24h: number
+  volumeSpikePct: number
+  relativeVolume: number
+  rsi15m: number
+  technicalTargetPct: number
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW'
+  reasons: string[]
+  social: SocialInsight
+  market: MarketTrendInsight
+}
+
+export interface MarketTrendInsight {
+  symbol: string
+  marketTrendScore: number
+  marketTrendLabel: 'EARLY TREND' | 'MARKET TRENDING' | 'BREAKOUT WATCH' | 'TOO LATE' | 'LOW LIQUIDITY' | 'WATCH'
+  coinGeckoTrendingRank: number | null
+  dexScreener: {
+    available: boolean
+    chainId: string | null
+    dexId: string | null
+    liquidityUsd: number | null
+    volume5mUsd: number | null
+    volume1hUsd: number | null
+    buys5m: number | null
+    sells5m: number | null
+    buyPressurePct: number | null
+    boostsActive: number | null
+    pairCreatedAt: number | null
+  }
+  geckoTerminal: {
+    trending: boolean
+    rank: number | null
+    network: string | null
+    poolName: string | null
+    liquidityUsd: number | null
+    volume24hUsd: number | null
+  }
+  reasons: string[]
+  sources: string[]
+  error: string | null
+}
+
+export interface PositionRecord {
+  id: string
+  symbol: string
+  quantity: number
+  totalCostUsdt: number
+  averageEntryPrice: number
+  maxLossPct: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PositionEvaluation extends PositionRecord {
+  currentPrice: number | null
+  currentValueUsdt: number | null
+  pnlUsdt: number | null
+  pnlPct: number | null
+  decision: 'PERTIMBANGKAN HOLD' | 'PANTAU KETAT' | 'TINJAU BATAS RISIKO' | 'DATA TIDAK TERSEDIA'
+  reasons: string[]
+  technicalStopLoss: number | null
+  support1: number | null
+  takeProfit1: number | null
+  takeProfit2: number | null
+  signal: SignalLabel | null
+  score: number | null
+  estimatedUpsideHighPct: number | null
+}
