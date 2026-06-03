@@ -8,6 +8,11 @@ type Data = {
   topMissedPumps: Array<{ symbol: string; gain24h: number; reason: string }>
   averageAlertAccuracy: number
   averageProfitAfterAlert: number
+  averageProfit1h: number
+  averageProfit4h: number
+  averageProfit24h: number
+  evaluatedSignals4h: number
+  pendingSignals4h: number
   bestPerformingIndicators: Array<{ symbol: string; rsi: number; volSpike: number; relVol: number; gainLossPct: number }>
 }
 
@@ -35,13 +40,15 @@ const Analytics = () => {
       <div className="text-xs uppercase tracking-[0.22em] text-cyan-300">Analytics</div>
       <h1 className="mt-2 text-2xl font-semibold">Evaluasi kualitas sinyal</h1>
     </header>
-    <div className="grid gap-3 md:grid-cols-2">
-      <div className="rounded-md border border-white/10 bg-slate-900/60 p-4"><div className="text-sm text-slate-400">Average Alert Accuracy</div><div className="mt-2 text-3xl font-semibold">{data.averageAlertAccuracy}%</div></div>
-      <div className="rounded-md border border-white/10 bg-slate-900/60 p-4"><div className="text-sm text-slate-400">Average Profit After Alert</div><div className="mt-2 text-3xl font-semibold">{data.averageProfitAfterAlert}%</div></div>
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="rounded-md border border-white/10 bg-slate-900/60 p-4"><div className="text-sm text-slate-400">4H Alert Accuracy</div><div className="mt-2 text-3xl font-semibold">{data.averageAlertAccuracy}%</div><div className="mt-2 text-xs text-slate-500">{data.evaluatedSignals4h} evaluated &middot; {data.pendingSignals4h} pending</div></div>
+      <div className="rounded-md border border-white/10 bg-slate-900/60 p-4"><div className="text-sm text-slate-400">Average Profit 1H</div><div className="mt-2 text-3xl font-semibold">{data.averageProfit1h}%</div></div>
+      <div className="rounded-md border border-white/10 bg-slate-900/60 p-4"><div className="text-sm text-slate-400">Average Profit 4H</div><div className="mt-2 text-3xl font-semibold">{data.averageProfit4h}%</div></div>
+      <div className="rounded-md border border-white/10 bg-slate-900/60 p-4"><div className="text-sm text-slate-400">Average Profit 24H</div><div className="mt-2 text-3xl font-semibold">{data.averageProfit24h}%</div></div>
     </div>
     <section>
       <h2 className="font-semibold">Top Alert Winners</h2>
-      <div className="mt-3 grid gap-2">{data.topAlertWinners.map((item) => <div key={item.id} className="flex justify-between rounded bg-slate-900/60 p-3 text-sm"><CoinLink symbol={item.symbol} /><span className="text-emerald-300">{item.gainLossPct}%</span></div>)}</div>
+      <div className="mt-3 grid gap-2">{data.topAlertWinners.map((item) => <div key={item.id} className="flex justify-between rounded bg-slate-900/60 p-3 text-sm"><CoinLink symbol={item.symbol} /><span className="text-emerald-300">{item.gain4hPct}% dalam 4H</span></div>)}</div>
     </section>
     <section>
       <h2 className="font-semibold">Top Missed Pumps</h2>

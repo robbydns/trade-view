@@ -41,7 +41,25 @@ const refresh = async () => {
     await persistQualifiedSignals(response.tickers);
     store.updateDebug({ lastScanTime: new Date().toISOString(), coinsScanned: response.tickers.length, coinsQualified: response.tickers.filter(isQualified).length });
 };
-const isQualified = (ticker) => ticker.score >= 80 && ['BUY WATCH', 'STRONG BUY', 'BREAKOUT'].includes(ticker.signal);
+const isQualified = (ticker) => ticker.score >= 88 &&
+    ['STRONG BUY', 'BREAKOUT'].includes(ticker.signal) &&
+    ticker.priceChange15m >= 0.5 &&
+    ticker.priceChange15m <= 6 &&
+    ticker.priceChange1h >= 0.5 &&
+    ticker.priceChange1h <= 12 &&
+    ticker.priceChange24h >= -2 &&
+    ticker.priceChange24h <= 20 &&
+    ticker.volumeSpikePct >= 150 &&
+    ticker.volumeSpikePct <= 1500 &&
+    ticker.relativeVolume >= 2 &&
+    ticker.relativeVolume <= 12 &&
+    ticker.rsi15m >= 52 &&
+    ticker.rsi15m <= 68 &&
+    ticker.ma10 > ticker.ma30 &&
+    ticker.distanceFromMa10Pct >= -1 &&
+    ticker.distanceFromMa10Pct <= 6 &&
+    ticker.volume24h >= 500000 &&
+    !ticker.isOverheated;
 const recordStatus = (ticker) => !ticker ? 'EXPIRED' : ticker.isOverheated ? 'OVERHEATED' : 'ACTIVE';
 const updatePersistedStatuses = (tickers) => {
     const currentBySymbol = new Map(tickers.map((ticker) => [ticker.symbol, ticker]));
@@ -51,6 +69,23 @@ const updatePersistedStatuses = (tickers) => {
             record.currentPrice = current?.price || record.currentPrice;
             record.gainLossPct = pct(record.currentPrice, record.priceAtAlert);
             record.status = recordStatus(current);
+            const recordTime = Date.parse(record.timestamp);
+            const symbolSnapshots = draft.snapshots.filter((snapshot) => snapshot.symbol === record.symbol && Date.parse(snapshot.timestamp) >= recordTime);
+            const nearestAfter = (hours) => {
+                const target = recordTime + hours * 60 * 60 * 1000;
+                const tolerance = 20 * 60 * 1000;
+                const nearest = symbolSnapshots.reduce((best, snapshot) => {
+                    const distance = Math.abs(Date.parse(snapshot.timestamp) - target);
+                    return distance <= tolerance && (!best || distance < Math.abs(Date.parse(best.timestamp) - target)) ? snapshot : best;
+                }, null);
+                return nearest ? pct(nearest.price, record.priceAtAlert) : null;
+            };
+            const snapshots4h = symbolSnapshots.filter((snapshot) => Date.parse(snapshot.timestamp) <= recordTime + 4 * 60 * 60 * 1000);
+            record.gain1hPct = nearestAfter(1);
+            record.gain4hPct = nearestAfter(4);
+            record.gain24hPct = nearestAfter(24);
+            record.maxGain4hPct = snapshots4h.length ? Math.max(...snapshots4h.map((snapshot) => pct(snapshot.price, record.priceAtAlert))) : null;
+            record.maxDrawdown4hPct = snapshots4h.length ? Math.min(...snapshots4h.map((snapshot) => pct(snapshot.price, record.priceAtAlert))) : null;
         }
     });
 };
@@ -69,7 +104,7 @@ const persistQualifiedSignals = async (tickers) => {
         const existing = store.get().signalHistory.find((record) => record.symbol === ticker.symbol && Date.now() - Date.parse(record.timestamp) < 30 * 60 * 1000);
         if (existing)
             continue;
-        const record = { id: id(), symbol: ticker.symbol, priceAtAlert: ticker.price, currentPrice: ticker.price, gainLossPct: 0, score: ticker.score, rsi: ticker.rsi15m, volSpike: ticker.volumeSpikePct, relVol: ticker.relativeVolume, openInterest: ticker.openInterest, signal: ticker.signal, timestamp: new Date().toISOString(), telegramSent: false, status: 'ACTIVE' };
+        const record = { id: id(), symbol: ticker.symbol, priceAtAlert: ticker.price, currentPrice: ticker.price, gainLossPct: 0, score: ticker.score, rsi: ticker.rsi15m, volSpike: ticker.volumeSpikePct, relVol: ticker.relativeVolume, openInterest: ticker.openInterest, signal: ticker.signal, timestamp: new Date().toISOString(), telegramSent: false, status: 'ACTIVE', gain1hPct: null, gain4hPct: null, gain24hPct: null, maxGain4hPct: null, maxDrawdown4hPct: null };
         store.addSignal(record);
         await sendLoggedTelegram(ticker, record.id);
     }
@@ -141,16 +176,24 @@ export const getEarlyPumpAnalysis = () => {
 };
 export const getAnalytics = () => {
     const history = store.get().signalHistory;
-    const winners = [...history].sort((a, b) => b.gainLossPct - a.gainLossPct).slice(0, 10);
-    const averageProfit = history.length ? Number((history.reduce((sum, item) => sum + item.gainLossPct, 0) / history.length).toFixed(2)) : 0;
-    const accuracy = history.length ? Number(((history.filter((item) => item.gainLossPct > 0).length / history.length) * 100).toFixed(2)) : 0;
-    return { topAlertWinners: winners, topMissedPumps: getMissedOpportunities().slice(0, 10), averageAlertAccuracy: accuracy, averageProfitAfterAlert: averageProfit, bestPerformingIndicators: winners.slice(0, 5).map((item) => ({ symbol: item.symbol, rsi: item.rsi, volSpike: item.volSpike, relVol: item.relVol, gainLossPct: item.gainLossPct })) };
+    const matured4h = history.filter((item) => typeof item.gain4hPct === 'number');
+    const matured1h = history.filter((item) => typeof item.gain1hPct === 'number');
+    const winners = [...matured4h].sort((a, b) => (b.gain4hPct || 0) - (a.gain4hPct || 0)).slice(0, 10);
+    const average = (items, key) => items.length ? Number((items.reduce((sum, item) => sum + Number(item[key] || 0), 0) / items.length).toFixed(2)) : 0;
+    const accuracy = matured4h.length ? Number(((matured4h.filter((item) => Number(item.gain4hPct) > 0).length / matured4h.length) * 100).toFixed(2)) : 0;
+    return {
+        topAlertWinners: winners, topMissedPumps: getMissedOpportunities().slice(0, 10), averageAlertAccuracy: accuracy,
+        averageProfitAfterAlert: average(matured4h, 'gain4hPct'), averageProfit1h: average(matured1h, 'gain1hPct'),
+        averageProfit4h: average(matured4h, 'gain4hPct'), averageProfit24h: average(history.filter((item) => typeof item.gain24hPct === 'number'), 'gain24hPct'),
+        evaluatedSignals4h: matured4h.length, pendingSignals4h: history.length - matured4h.length,
+        bestPerformingIndicators: winners.slice(0, 5).map((item) => ({ symbol: item.symbol, rsi: item.rsi, volSpike: item.volSpike, relVol: item.relVol, gainLossPct: item.gain4hPct || 0 }))
+    };
 };
 export const getTwentyPercentRadar = () => buildTwentyPercentRadar(response.tickers);
 const evaluatePosition = async (position) => {
     const ticker = await getCoin(position.symbol);
     if (!ticker)
-        return { ...position, currentPrice: null, currentValueUsdt: null, pnlUsdt: null, pnlPct: null, decision: 'DATA TIDAK TERSEDIA', reasons: ['Data Binance coin tidak tersedia. Evaluasi sengaja dikosongkan.'], technicalStopLoss: null, support1: null, takeProfit1: null, takeProfit2: null, signal: null, score: null, estimatedUpsideHighPct: null };
+        return { ...position, currentPrice: null, currentValueUsdt: null, pnlUsdt: null, pnlPct: null, decision: 'DATA TIDAK TERSEDIA', reasons: ['Data Binance coin tidak tersedia. Evaluasi sengaja dikosongkan.'], technicalStopLoss: null, support1: null, takeProfit1: null, takeProfit2: null, signal: null, score: null, estimatedUpsideHighPct: null, upsideToTp1FromEntryPct: null, upsideToTp2FromEntryPct: null, riskToStopFromEntryPct: null, outlook: 'DATA TIDAK TERSEDIA' };
     const currentValueUsdt = Number((position.quantity * ticker.price).toFixed(8));
     const pnlUsdt = Number((currentValueUsdt - position.totalCostUsdt).toFixed(8));
     const pnlPct = pct(currentValueUsdt, position.totalCostUsdt);
@@ -158,6 +201,10 @@ const evaluatePosition = async (position) => {
     const belowPersonalRisk = pnlPct <= -position.maxLossPct;
     const belowTechnicalStop = ticker.price <= ticker.entry.stopLoss;
     let decision = 'PANTAU KETAT';
+    const upsideToTp1FromEntryPct = pct(ticker.entry.takeProfit1, position.averageEntryPrice);
+    const upsideToTp2FromEntryPct = pct(ticker.entry.takeProfit2, position.averageEntryPrice);
+    const riskToStopFromEntryPct = pct(ticker.entry.stopLoss, position.averageEntryPrice);
+    let outlook = 'PELUANG NAIK TERBATAS';
     if (belowPersonalRisk || belowTechnicalStop) {
         decision = 'TINJAU BATAS RISIKO';
         if (belowPersonalRisk)
@@ -183,19 +230,33 @@ const evaluatePosition = async (position) => {
     else {
         reasons.push('Momentum belum cukup kuat untuk status hold');
     }
-    return { ...position, currentPrice: ticker.price, currentValueUsdt, pnlUsdt, pnlPct, decision, reasons, technicalStopLoss: ticker.entry.stopLoss, support1: ticker.support1, takeProfit1: ticker.entry.takeProfit1, takeProfit2: ticker.entry.takeProfit2, signal: ticker.signal, score: ticker.score, estimatedUpsideHighPct: ticker.estimatedUpsideHighPct };
+    if (ticker.score >= 65 && ticker.ma10 > ticker.ma30 && ticker.price >= ticker.support1 && ticker.rsi15m < 70 && upsideToTp1FromEntryPct > 0) {
+        outlook = 'PELUANG NAIK MASIH TERBUKA';
+        reasons.push(`Dari entry, ruang ke TP1 sekitar ${upsideToTp1FromEntryPct}% dan ke TP2 sekitar ${upsideToTp2FromEntryPct}%`);
+    }
+    else if (ticker.price < ticker.support1 || ticker.ma10 < ticker.ma30 || belowTechnicalStop) {
+        outlook = 'RISIKO TURUN MENINGKAT';
+        reasons.push(`Dari entry, risiko ke stop teknikal sekitar ${riskToStopFromEntryPct}%`);
+    }
+    else {
+        reasons.push('Ruang naik dari entry terbatas atau belum terkonfirmasi');
+    }
+    return { ...position, currentPrice: ticker.price, currentValueUsdt, pnlUsdt, pnlPct, decision, reasons, technicalStopLoss: ticker.entry.stopLoss, support1: ticker.support1, takeProfit1: ticker.entry.takeProfit1, takeProfit2: ticker.entry.takeProfit2, signal: ticker.signal, score: ticker.score, estimatedUpsideHighPct: ticker.estimatedUpsideHighPct, upsideToTp1FromEntryPct, upsideToTp2FromEntryPct, riskToStopFromEntryPct, outlook };
 };
 export const getPortfolio = async () => Promise.all(store.get().positions.map(evaluatePosition));
 export const upsertPosition = (input) => {
     const symbol = normalizeSymbol(input.symbol);
     const quantity = Number(input.quantity);
-    const totalCostUsdt = Number(input.totalCostUsdt);
+    const entryPrice = Number(input.entryPrice);
+    const submittedTotal = Number(input.totalCostUsdt);
+    const totalCostUsdt = Number.isFinite(submittedTotal) && submittedTotal > 0 ? submittedTotal : quantity * entryPrice;
+    const averageEntryPrice = Number.isFinite(entryPrice) && entryPrice > 0 ? entryPrice : totalCostUsdt / quantity;
     const maxLossPct = Number(input.maxLossPct ?? 5);
-    if (!symbol || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(totalCostUsdt) || totalCostUsdt <= 0 || !Number.isFinite(maxLossPct) || maxLossPct <= 0 || maxLossPct > 100)
-        throw new Error('Jumlah coin, total modal, dan batas rugi wajib diisi dengan angka valid.');
+    if (!symbol || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(averageEntryPrice) || averageEntryPrice <= 0 || !Number.isFinite(totalCostUsdt) || totalCostUsdt <= 0 || !Number.isFinite(maxLossPct) || maxLossPct <= 0 || maxLossPct > 100)
+        throw new Error('Jumlah coin, harga entry, total modal, dan batas rugi wajib diisi dengan angka valid.');
     const existing = store.get().positions.find((item) => item.symbol === symbol);
     const now = new Date().toISOString();
-    const record = { id: existing?.id || id(), symbol, quantity, totalCostUsdt, averageEntryPrice: Number((totalCostUsdt / quantity).toFixed(8)), maxLossPct, createdAt: existing?.createdAt || now, updatedAt: now };
+    const record = { id: existing?.id || id(), symbol, quantity, totalCostUsdt: Number(totalCostUsdt.toFixed(8)), averageEntryPrice: Number(averageEntryPrice.toFixed(8)), maxLossPct, createdAt: existing?.createdAt || now, updatedAt: now };
     store.upsertPosition(record);
     return record;
 };

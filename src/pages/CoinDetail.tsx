@@ -44,6 +44,7 @@ const CoinDetail = () => {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [quantity, setQuantity] = useState('')
+  const [entryPrice, setEntryPrice] = useState('')
   const [totalCostUsdt, setTotalCostUsdt] = useState('')
   const [maxLossPct, setMaxLossPct] = useState('5')
 
@@ -80,7 +81,7 @@ const CoinDetail = () => {
   const saveTradePosition = async () => {
     if (!ticker) return
     try {
-      await savePosition({ symbol: ticker.symbol, quantity: Number(quantity), totalCostUsdt: Number(totalCostUsdt), maxLossPct: Number(maxLossPct) })
+      await savePosition({ symbol: ticker.symbol, quantity: Number(quantity), entryPrice: Number(entryPrice), totalCostUsdt: totalCostUsdt ? Number(totalCostUsdt) : undefined, maxLossPct: Number(maxLossPct) })
       setMessage(`Posisi ${ticker.symbol} tersimpan. Pantau evaluasinya melalui menu Portfolio.`)
     } catch (err) {
       setMessage(`ERROR: ${(err as Error).message}`)
@@ -150,17 +151,18 @@ const CoinDetail = () => {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="font-semibold text-white">Catat Posisi Trading</h2>
-          <p className="mt-1 text-xs text-slate-400">Simpan jumlah coin dan total modal agar Portfolio dapat menghitung P/L serta menampilkan pertimbangan risiko.</p>
+          <p className="mt-1 text-xs text-slate-400">Simpan harga entry agar Portfolio dapat menghitung P/L dan menilai peluang naik dari posisi yang Anda ambil.</p>
         </div>
         <Link to="/portfolio" className="rounded-md border border-cyan-400/30 px-3 py-2 text-xs text-cyan-200">Buka Portfolio</Link>
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+      <div className="mt-3 grid gap-2 sm:grid-cols-5">
         <label className="text-xs text-slate-400">Jumlah coin<input type="number" min="0" step="any" value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="Contoh: 1000" className="mt-1 w-full rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" /></label>
-        <label className="text-xs text-slate-400">Total modal USDT<input type="number" min="0" step="any" value={totalCostUsdt} onChange={(event) => setTotalCostUsdt(event.target.value)} placeholder="Contoh: 50" className="mt-1 w-full rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" /></label>
+        <label className="text-xs text-slate-400">Harga entry USDT<div className="mt-1 flex gap-1"><input type="number" min="0" step="any" value={entryPrice} onChange={(event) => setEntryPrice(event.target.value)} placeholder="Harga beli" className="min-w-0 flex-1 rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" /><button type="button" onClick={() => setEntryPrice(String(ticker.price))} className="rounded-md border border-cyan-400/30 px-2 text-cyan-200" title="Gunakan harga Binance saat ini">Kini</button></div></label>
+        <label className="text-xs text-slate-400">Total modal USDT (opsional)<input type="number" min="0" step="any" value={totalCostUsdt} onChange={(event) => setTotalCostUsdt(event.target.value)} placeholder="Otomatis dari entry" className="mt-1 w-full rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" /></label>
         <label className="text-xs text-slate-400">Batas rugi pribadi %<input type="number" min="0.1" max="100" step="0.1" value={maxLossPct} onChange={(event) => setMaxLossPct(event.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-slate-950 px-3 py-2 text-sm text-white" /></label>
         <div className="flex items-end"><button type="button" onClick={saveTradePosition} className="w-full rounded-md bg-cyan-500 px-3 py-2 text-sm font-semibold text-slate-950">Simpan Posisi</button></div>
       </div>
-      <div className="mt-2 text-xs text-slate-500">Average entry preview: {Number(quantity) > 0 && Number(totalCostUsdt) > 0 ? `${value(Number(totalCostUsdt) / Number(quantity))} USDT` : '-'}</div>
+      <div className="mt-2 text-xs text-slate-500">Estimasi modal dari entry: {Number(quantity) > 0 && Number(entryPrice) > 0 ? `${value(Number(quantity) * Number(entryPrice))} USDT` : '-'}</div>
     </section>
 
     <section className="rounded-md border border-white/10 bg-slate-900/60 p-3">

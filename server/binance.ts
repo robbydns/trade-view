@@ -90,6 +90,28 @@ const buildEntryPlan = (price: number, support1: number, support2: number, resis
   stopLoss: round(support2 * 0.992)
 })
 
+const applyHigherTimeframeConfirmation = (signal: { score: number; signal: SignalLabel; isEarlyPump: boolean; isOverheated: boolean; reasons: string[] }, candles1h: Candle[], candles1d: Candle[]) => {
+  const trend = (candles: Candle[]) => {
+    const closes = candles.map((candle) => candle.close)
+    const ma20 = average(closes.slice(-20))
+    const ma50 = average(closes.slice(-50))
+    const latest = closes[closes.length - 1]
+    return latest > ma20 && ma20 > ma50 ? 'BULLISH' : latest < ma20 && ma20 < ma50 ? 'BEARISH' : 'SIDEWAYS'
+  }
+  const trend1h = trend(candles1h)
+  const trend1d = trend(candles1d)
+  let score = signal.score
+  const reasons = [...signal.reasons]
+  if (trend1h === 'BULLISH') { score += 5; reasons.push('Konfirmasi tren 1H bullish') }
+  if (trend1d === 'BULLISH') { score += 8; reasons.push('Konfirmasi tren 1D bullish') }
+  if (trend1h === 'BEARISH') { score -= 12; reasons.push('Momentum 15m melawan tren 1H bearish') }
+  if (trend1d === 'BEARISH') { score -= 18; reasons.push('Counter trend: arah besar 1D masih bearish') }
+  score = Math.max(0, Math.min(100, score))
+  let label: SignalLabel = score >= 90 ? 'STRONG BUY' : score >= 80 ? 'BREAKOUT' : score >= 65 ? 'BUY WATCH' : score >= 50 ? 'WAIT' : 'AVOID'
+  if (signal.isOverheated) label = 'OVERHEATED'
+  return { ...signal, score, signal: label, reasons }
+}
+
 const buildSignal = (input: Omit<MarketTicker, 'score' | 'signal' | 'isEarlyPump' | 'isOverheated' | 'reasons' | 'entry' | 'estimatedUpsideLowPct' | 'estimatedUpsideHighPct' | 'openInterest'>) => {
   const reasons: string[] = []
   const vertical15m = input.priceChange15m > 10
@@ -100,6 +122,13 @@ const buildSignal = (input: Omit<MarketTicker, 'score' | 'signal' | 'isEarlyPump
   const hadPullback = recentCandles.slice(0, -1).some((candle) => candle.close < input.ma10 || candle.low < input.ma10)
   const reclaimingMa10 = latest.close >= input.ma10 * 0.995 && latest.close <= input.ma10 * 1.035
   const reboundCandle = latest.close > latest.open && latest.close > previous.close
+  const candleRange = Math.max(latest.high - latest.low, latest.close * 0.000001)
+  const candleBody = Math.abs(latest.close - latest.open)
+  const upperWick = latest.high - Math.max(latest.open, latest.close)
+  const closeNearHigh = (latest.high - latest.close) / candleRange <= 0.25
+  const upperWickRisk = upperWick > candleBody * 1.5 && upperWick / candleRange > 0.35
+  const liquidEnough = input.volume24h >= 500000
+  const orderlyVolume = input.relativeVolume <= 12 && input.volumeSpikePct <= 1500
   const earlySetup = hadPullback && reclaimingMa10 && reboundCandle && input.priceChange15m >= 0.15 && input.priceChange15m < 2.5 && input.priceChange24h < 18 && input.relativeVolume >= 1.15 && input.rsi15m >= 42 && input.rsi15m <= 68
   const isEarlyPump = earlySetup || (input.priceChange15m >= 2 && input.priceChange15m <= 8 && input.priceChange24h <= 25 && input.volumeSpikePct >= 150 && input.relativeVolume > 2 && input.ma10 > input.ma30 && input.rsi15m >= 50 && input.rsi15m <= 70 && input.distanceFromMa10Pct <= 8)
   let score = 0
@@ -112,12 +141,20 @@ const buildSignal = (input: Omit<MarketTicker, 'score' | 'signal' | 'isEarlyPump
   if (input.ma10 > input.ma30) { score += 15; reasons.push('MA10 berada di atas MA30') }
   if (input.rsi15m >= 50 && input.rsi15m <= 70) { score += 10; reasons.push(`RSI 15m sehat di ${input.rsi15m}`) }
   if (input.price >= input.resistance1) { score += 10; reasons.push('Harga breakout resistance lokal') }
-  if (input.volume1h > average([input.volume15m]) * 4) { score += 5; reasons.push('Volume 1 jam menguat') }
+  if (input.priceChange1h >= 0.5 && input.priceChange1h <= 12) { score += 8; reasons.push(`Momentum 1 jam sehat di ${input.priceChange1h}%`) }
+  if (latest.close > latest.open && closeNearHigh) { score += 7; reasons.push('Candle ditutup dekat high tanpa rejection besar') }
+  if (liquidEnough) { score += 5; reasons.push('Likuiditas volume 24 jam memadai') }
 
   if (input.priceChange24h > 30) { score -= 25; reasons.push('24h sudah naik lebih dari 30%') }
+  if (input.priceChange24h < -5) { score -= 15; reasons.push('Trend 24h masih negatif') }
+  if (input.priceChange1h < 0) { score -= 15; reasons.push('Momentum 1 jam masih negatif') }
   if (input.distanceFromMa10Pct > 12) { score -= 20; reasons.push('Harga terlalu jauh dari MA10') }
+  if (input.distanceFromMa10Pct < -2) { score -= 15; reasons.push('Harga masih berada cukup jauh di bawah MA10') }
   if (input.rsi15m > 75) { score -= 15; reasons.push('RSI di atas 75') }
   if (input.volumeSpikePct > 150 && input.priceChange15m < 0.5) { score -= 15; reasons.push('Volume besar tetapi harga belum ikut naik') }
+  if (!liquidEnough) { score -= 20; reasons.push('Volume 24 jam terlalu rendah untuk sinyal berkualitas') }
+  if (!orderlyVolume) { score -= 15; reasons.push('Lonjakan volume terlalu ekstrem dan rawan distribusi') }
+  if (upperWickRisk) { score -= 20; reasons.push('Wick atas besar menunjukkan rejection') }
   score = Math.max(0, Math.min(100, score))
 
   let signal: SignalLabel = earlySetup && score >= 45 ? 'EARLY SETUP' : score >= 90 ? 'STRONG BUY' : score >= 80 ? 'BREAKOUT' : score >= 65 ? 'BUY WATCH' : score >= 50 ? (input.price < input.ma10 ? 'PULLBACK' : 'WAIT') : 'AVOID'
@@ -328,7 +365,20 @@ export class BinanceRealtimeService {
         candles,
         updatedAt: new Date().toISOString()
       }
-      const signal = buildSignal(base)
+      let signal = buildSignal(base)
+      if (signal.score >= 65) {
+        try {
+          const [candles1hResponse, candles1dResponse] = await Promise.all([
+            this.request('/api/v3/klines', { symbol: raw.s, interval: '1h', limit: 60 }),
+            this.request('/api/v3/klines', { symbol: raw.s, interval: '1d', limit: 60 })
+          ])
+          const candles1h = (candles1hResponse.data as unknown[][]).map(parseCandle)
+          const candles1d = (candles1dResponse.data as unknown[][]).map(parseCandle)
+          if (candles1h.length >= 50 && candles1d.length >= 50) signal = applyHigherTimeframeConfirmation(signal, candles1h, candles1d)
+        } catch {
+          signal = { ...signal, score: Math.max(0, signal.score - 10), reasons: [...signal.reasons, 'Konfirmasi multi-timeframe gagal diambil; score dikurangi'] }
+        }
+      }
       const entry = buildEntryPlan(price, levels.support1, levels.support2, levels.resistance1, levels.resistance2)
       const openInterest = signal.score >= 55 ? await this.fetchOpenInterest(raw.s) : null
       const ticker: MarketTicker = {

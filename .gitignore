@@ -8,3 +8,6 @@ npm-debug.log*
 .env
 *.log
 server/store.json
+server/store.json
+server/store.json
+server/watchlist.json

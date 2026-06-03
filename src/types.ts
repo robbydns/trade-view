@@ -71,6 +71,11 @@ export interface SignalHistoryRecord {
   timestamp: string
   telegramSent: boolean
   status: 'ACTIVE' | 'EXPIRED' | 'OVERHEATED'
+  gain1hPct?: number | null
+  gain4hPct?: number | null
+  gain24hPct?: number | null
+  maxGain4hPct?: number | null
+  maxDrawdown4hPct?: number | null
 }
 
 export interface TelegramLogRecord {
@@ -211,4 +216,8 @@ export interface PositionEvaluation extends PositionRecord {
   signal: SignalLabel | null
   score: number | null
   estimatedUpsideHighPct: number | null
+  upsideToTp1FromEntryPct: number | null
+  upsideToTp2FromEntryPct: number | null
+  riskToStopFromEntryPct: number | null
+  outlook: 'PELUANG NAIK MASIH TERBUKA' | 'PELUANG NAIK TERBATAS' | 'RISIKO TURUN MENINGKAT' | 'DATA TIDAK TERSEDIA'
 }

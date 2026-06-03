@@ -7,6 +7,7 @@ const number = (value: number | null, digits = 4) => value === null ? 'N/A' : ne
 const money = (value: number | null) => value === null ? 'N/A' : `${number(value, 2)} USDT`
 const tone = (value: number | null) => value === null ? 'text-slate-400' : value >= 0 ? 'text-emerald-300' : 'text-rose-300'
 const decisionTone = (decision: PositionEvaluation['decision']) => decision === 'PERTIMBANGKAN HOLD' ? 'border-emerald-400/40 text-emerald-300' : decision === 'TINJAU BATAS RISIKO' ? 'border-rose-400/40 text-rose-300' : 'border-amber-400/40 text-amber-300'
+const outlookTone = (outlook: PositionEvaluation['outlook']) => outlook === 'PELUANG NAIK MASIH TERBUKA' ? 'text-emerald-300' : outlook === 'RISIKO TURUN MENINGKAT' ? 'text-rose-300' : 'text-amber-300'
 
 const Portfolio = () => {
   const [records, setRecords] = useState<PositionEvaluation[]>([])
@@ -46,17 +47,20 @@ const Portfolio = () => {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <Link to={`/coin/${item.symbol}`} className="text-lg font-semibold text-white hover:text-cyan-200">{item.symbol}</Link>
-            <div className="mt-1 text-xs text-slate-400">{number(item.quantity)} coin &middot; modal {money(item.totalCostUsdt)} &middot; average {number(item.averageEntryPrice, 8)}</div>
+            <div className="mt-1 text-xs text-slate-400">{number(item.quantity)} coin &middot; modal {money(item.totalCostUsdt)} &middot; entry {number(item.averageEntryPrice, 8)}</div>
+            <div className={`mt-2 text-sm font-semibold ${outlookTone(item.outlook)}`}>{item.outlook}</div>
           </div>
           <span className={`rounded-full border px-2 py-1 text-[0.65rem] font-semibold ${decisionTone(item.decision)}`}>{item.decision}</span>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-6">
+        <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-8">
           <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Harga Kini</div><div className="mt-1">{number(item.currentPrice, 8)}</div></div>
           <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Nilai Kini</div><div className="mt-1">{money(item.currentValueUsdt)}</div></div>
           <div className="rounded bg-white/5 p-2"><div className="text-slate-500">P/L</div><div className={`mt-1 ${tone(item.pnlPct)}`}>{item.pnlPct === null ? 'N/A' : `${item.pnlPct > 0 ? '+' : ''}${number(item.pnlPct, 2)}%`}</div></div>
           <div className="rounded bg-white/5 p-2"><div className="text-slate-500">P/L USDT</div><div className={`mt-1 ${tone(item.pnlUsdt)}`}>{money(item.pnlUsdt)}</div></div>
           <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Stop Teknikal</div><div className="mt-1">{number(item.technicalStopLoss, 8)}</div></div>
           <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Batas Rugi</div><div className="mt-1 text-rose-300">-{number(item.maxLossPct, 2)}%</div></div>
+          <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Entry ke TP1</div><div className="mt-1 text-emerald-300">{item.upsideToTp1FromEntryPct === null ? 'N/A' : `${number(item.upsideToTp1FromEntryPct, 2)}%`}</div></div>
+          <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Entry ke Stop</div><div className="mt-1 text-rose-300">{item.riskToStopFromEntryPct === null ? 'N/A' : `${number(item.riskToStopFromEntryPct, 2)}%`}</div></div>
         </div>
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs text-slate-400">{item.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
         <div className="mt-3 flex gap-2">
