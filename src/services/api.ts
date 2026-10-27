@@ -1,4 +1,4 @@
-import { Candle, DebugState, MarketTicker, PositionEvaluation, PositionRecord, ScannerSettings, ScanResponse, SignalHistoryRecord, TelegramLogRecord, TelegramSettings, TwentyPercentCandidate } from '../types'
+import { Candle, DebugState, MarketTicker, OnchainDashboard, PositionEvaluation, PositionRecord, ScannerSettings, ScanResponse, SignalHistoryRecord, TelegramLogRecord, TelegramSettings, TwentyPercentCandidate } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 const AUTH_TOKEN_KEY = 'crypto-signal-compass-auth-token'
@@ -29,7 +29,7 @@ export const login = (email: string, password: string) => request<{ token: strin
 export const fetchSession = () => request<{ authenticated: boolean }>('/auth/session')
 export const fetchScan = () => request<ScanResponse>('/scan')
 export const fetchCoin = (symbol: string) => request<{ ticker: MarketTicker; history: MarketTicker[]; idrRate: number | null; idrRateUpdatedAt: string | null; idrRateSource: 'CoinGecko' | null }>(`/coins/${symbol}`)
-export const fetchCoinKlines = (symbol: string, interval: '15m' | '1h' | '4h' | '1d', limit = 200) => request<{ symbol: string; interval: string; candles: Candle[] }>(`/coins/${symbol}/klines?interval=${interval}&limit=${limit}`)
+export const fetchCoinKlines = (symbol: string, interval: '1m' | '15m' | '1h' | '4h' | '1d', limit = 200) => request<{ symbol: string; interval: string; candles: Candle[] }>(`/coins/${symbol}/klines?interval=${interval}&limit=${limit}`)
 export const fetchWatchlist = () => request<{ symbols: string[] }>('/watchlist')
 export const addWatchlist = (symbol: string) => request<{ symbols: string[] }>('/watchlist', {
   method: 'POST',
@@ -48,7 +48,8 @@ export const fetchSignalHistory = () => request<{ records: SignalHistoryRecord[]
 export const fetchTelegramLogs = () => request<{ records: TelegramLogRecord[] }>('/telegram/logs')
 export const fetchDebug = () => request<DebugState>('/debug')
 export const fetchMissedOpportunities = () => request<{ records: Array<{ symbol: string; gain24h: number; reason: string }> }>('/missed-opportunities')
-export const fetchAnalytics = () => request<{ topAlertWinners: SignalHistoryRecord[]; topMissedPumps: Array<{ symbol: string; gain24h: number; reason: string }>; averageAlertAccuracy: number; averageProfitAfterAlert: number; averageProfit1h: number; averageProfit4h: number; averageProfit24h: number; evaluatedSignals4h: number; pendingSignals4h: number; bestPerformingIndicators: Array<{ symbol: string; rsi: number; volSpike: number; relVol: number; gainLossPct: number }> }>('/analytics')
+export const fetchAnalytics = () => request<{ topAlertWinners: SignalHistoryRecord[]; topMissedPumps: Array<{ symbol: string; gain24h: number; reason: string }>; averageAlertAccuracy: number; averageProfitAfterAlert: number; averageProfit1h: number; averageProfit4h: number; averageProfit24h: number; evaluatedSignals4h: number; pendingSignals4h: number; bestPerformingIndicators: Array<{ symbol: string; rsi: number; volSpike: number; relVol: number; gainLossPct: number }>; liveEarlyCandidates: Array<{ symbol: string; price: number; score: number; mode: 'EARLY_IGNITION' | 'BREAKOUT_CONFIRM' | 'PULLBACK_REENTRY' | 'NO_ALERT'; action: 'ENTER_NOW' | 'WAIT_PULLBACK' | 'WAIT_BREAKOUT' | 'AVOID'; entryLow: number | null; entryHigh: number | null; triggerPrice: number | null; takeProfit1: number; stopLoss: number; priceChange15m: number; priceChange1h: number; volumeSpikePct: number; relativeVolume: number; macdTrend: 'BULLISH' | 'BEARISH' | 'NEUTRAL'; orderBookPressure: 'BUY' | 'SELL' | 'BALANCED'; whaleScore: number; breakoutState: string }> }>('/analytics')
+export const fetchOnchainDashboard = () => request<OnchainDashboard>('/onchain')
 export const fetchEarlyPumpAnalysis = () => request<{ records: Array<{ symbol: string; gain24h: number; snapshots: Array<{ timestamp: string; price: number; volume: number; volSpike: number; relVol: number; rsi: number; openInterest: number | null }> }> }>('/early-pump-analysis')
 export const fetchScannerSettings = () => request<ScannerSettings>('/scanner/settings')
 export const updateScannerSettings = (settings: ScannerSettings) => request<ScannerSettings>('/scanner/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })

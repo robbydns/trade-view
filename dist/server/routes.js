@@ -1,5 +1,5 @@
 import express from 'express';
-import { addWatchlist, getAnalytics, getCoin, getCoinKlines, getDebug, getEarlyPumpAnalysis, getMissedOpportunities, getPersistentSignalHistory, getPortfolio, getScanResponse, getScannerSettings, getSignalHistory, getTelegramLogs, getTwentyPercentRadar, getWatchlist, logTelegramTest, removePosition, removeWatchlist, updateScannerSettings, upsertPosition } from './scheduler.js';
+import { addWatchlist, getAnalytics, getCoin, getCoinKlines, getDebug, getEarlyPumpAnalysis, getMissedOpportunities, getOnchainDashboard, getPersistentSignalHistory, getPortfolio, getScanResponse, getScannerSettings, getSignalHistory, getTelegramLogs, getTwentyPercentRadar, getWatchlist, logTelegramTest, removePosition, removeWatchlist, updateScannerSettings, upsertPosition } from './scheduler.js';
 import { getTelegramSettings, testTelegramAlert, updateTelegramSettings } from './alert.js';
 import { createSessionToken, credentialsAreValid, requireAuth } from './auth.js';
 const router = express.Router();
@@ -88,6 +88,11 @@ router.get('/debug', (_req, res) => res.json(getDebug()));
 router.get('/missed-opportunities', (_req, res) => res.json({ records: getMissedOpportunities() }));
 router.get('/early-pump-analysis', (_req, res) => res.json({ records: getEarlyPumpAnalysis() }));
 router.get('/analytics', (_req, res) => res.json(getAnalytics()));
+router.get('/onchain', (_req, res) => res.json(getOnchainDashboard()));
+router.get('/onchain/status', (_req, res) => res.json(getOnchainDashboard().status));
+router.get('/onchain/summaries', (_req, res) => res.json({ summaries: getOnchainDashboard().summaries }));
+router.get('/onchain/trades', (_req, res) => res.json({ trades: getOnchainDashboard().recentTrades }));
+router.get('/onchain/alerts', (_req, res) => res.json({ alerts: getOnchainDashboard().alerts }));
 router.get('/twenty-percent-radar', async (_req, res) => res.json(await getTwentyPercentRadar()));
 router.get('/portfolio', async (_req, res) => res.json({ records: await getPortfolio() }));
 router.post('/portfolio', (req, res) => {

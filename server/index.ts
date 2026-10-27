@@ -4,7 +4,7 @@ import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import router from './routes.js'
-import { initializeScheduler } from './scheduler.js'
+import { initializeScheduler, stopScheduler } from './scheduler.js'
 
 dotenv.config()
 
@@ -27,9 +27,16 @@ app.get('*', (req, res) => {
 })
 
 const startServer = async () => {
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`Server berjalan di http://localhost:${port}`)
   })
+
+  const shutdown = () => {
+    stopScheduler()
+    server.close(() => process.exit(0))
+  }
+  process.once('SIGINT', shutdown)
+  process.once('SIGTERM', shutdown)
 
   initializeScheduler().catch((error) => {
     console.error('Failed to initialize scheduler:', error)

@@ -10,10 +10,11 @@ import Portfolio from './pages/Portfolio'
 import SignalHistory from './pages/SignalHistory'
 import TelegramLog from './pages/TelegramLog'
 import TwentyPercentRadar from './pages/TwentyPercentRadar'
+import WalletScan from './pages/WalletScan'
 import Watchlist from './pages/Watchlist'
 import { clearAuthToken, fetchSession, getAuthToken } from './services/api'
 
-const links = [['Scanner', '/'], ['20% Radar', '/twenty-percent-radar'], ['Portfolio', '/portfolio'], ['Signal History', '/signal-history'], ['Telegram Log', '/telegram-log'], ['Analytics', '/analytics'], ['Watchlist', '/watchlist'], ['Telegram', '/telegram'], ['Edukasi', '/education']]
+const links = [['Scanner', '/'], ['Wallet Inflow', '/wallet-scan'], ['20% Radar', '/twenty-percent-radar'], ['Portfolio', '/portfolio'], ['Signal History', '/signal-history'], ['Telegram Log', '/telegram-log'], ['Analytics', '/analytics'], ['Watchlist', '/watchlist'], ['Telegram', '/telegram'], ['Edukasi', '/education']]
 
 const App = () => {
   const [authenticated, setAuthenticated] = useState(Boolean(getAuthToken()))
@@ -45,7 +46,7 @@ const App = () => {
         <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="text-lg font-semibold text-cyan-300">Crypto Signal Compass</div>
-            <div className="text-xs text-slate-500">Binance real-time only</div>
+            <div className="text-xs text-slate-500">Binance market data · optional Bitquery on-chain feed</div>
           </div>
           <div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1">
             <nav className="flex gap-2">
@@ -62,6 +63,7 @@ const App = () => {
           <Route path="/signal-history" element={<SignalHistory />} />
           <Route path="/telegram-log" element={<TelegramLog />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/wallet-scan" element={<WalletScan />} />
           <Route path="/twenty-percent-radar" element={<TwentyPercentRadar />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/watchlist" element={<Watchlist />} />

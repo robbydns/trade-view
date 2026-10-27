@@ -10,6 +10,8 @@ const rupiah = (value: number, idrRate: number | null | undefined) => idrRate ? 
 const percent = (value: number) => <span className={value > 0 ? 'text-emerald-300' : value < 0 ? 'text-rose-300' : 'text-slate-300'}>{value > 0 ? '+' : ''}{number(value)}%</span>
 const signals: Array<'ALL' | SignalLabel> = ['ALL', 'EARLY SETUP', 'STRONG BUY', 'BREAKOUT', 'BUY WATCH', 'PULLBACK', 'WAIT', 'OVERHEATED', 'AVOID']
 const PAGE_SIZE = 25
+const actionTone = (action: MarketTicker['pumpProjection']['action']) => action === 'ENTER_NOW' ? 'text-emerald-300' : action === 'AVOID' ? 'text-rose-300' : 'text-amber-300'
+const actionText = (action: MarketTicker['pumpProjection']['action']) => action === 'ENTER_NOW' ? 'ENTRY' : action === 'WAIT_PULLBACK' ? 'WAIT PULLBACK' : action === 'WAIT_BREAKOUT' ? 'WAIT BREAKOUT' : 'AVOID'
 
 const Overview = () => {
   const [data, setData] = useState<ScanResponse | null>(null)
@@ -22,7 +24,7 @@ const Overview = () => {
   const [rsiMax, setRsiMax] = useState(100)
   const [hideOverheated, setHideOverheated] = useState(false)
   const [earlyOnly, setEarlyOnly] = useState(false)
-  const [sort, setSort] = useState<'score' | 'volumeSpikePct' | 'priceChange15m'>('score')
+  const [sort, setSort] = useState<'score' | 'volumeSpikePct' | 'priceChange15m' | 'orderBookImbalance'>('score')
   const [message, setMessage] = useState('')
   const [page, setPage] = useState(1)
   const [debug, setDebug] = useState<DebugState | null>(null)
@@ -75,7 +77,7 @@ const Overview = () => {
       .filter((ticker) => ticker.rsi15m >= rsiMin && ticker.rsi15m <= rsiMax)
       .filter((ticker) => !hideOverheated || !ticker.isOverheated)
       .filter((ticker) => !earlyOnly || ticker.isEarlyPump)
-      .sort((a, b) => b[sort] - a[sort])
+      .sort((a, b) => sort === 'orderBookImbalance' ? b.orderBook.imbalancePct - a.orderBook.imbalancePct : b[sort] - a[sort])
   }, [data, earlyOnly, hideOverheated, minimumChange15m, minimumScore, minimumSpike, rsiMax, rsiMin, search, signal, sort])
 
   const saveWatchlist = async (ticker: MarketTicker) => {
@@ -132,7 +134,7 @@ const Overview = () => {
         <input type="number" value={minimumSpike} onChange={(event) => setMinimumSpike(event.target.value)} placeholder="Min spike % (opsional)" className="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm" />
         <input type="number" value={rsiMin} onChange={(event) => setRsiMin(Number(event.target.value))} placeholder="RSI min" className="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm" />
         <input type="number" value={rsiMax} onChange={(event) => setRsiMax(Number(event.target.value))} placeholder="RSI max" className="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm" />
-        <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm"><option value="score">Sort score</option><option value="volumeSpikePct">Sort spike</option><option value="priceChange15m">Sort 15m</option></select>
+        <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="rounded-md border border-white/10 bg-slate-900 px-3 py-2 text-sm"><option value="score">Sort score</option><option value="volumeSpikePct">Sort spike</option><option value="priceChange15m">Sort 15m</option><option value="orderBookImbalance">Sort order book</option></select>
         <label className="flex items-center gap-2 text-xs text-slate-300 sm:text-sm"><input type="checkbox" checked={hideOverheated} onChange={(event) => setHideOverheated(event.target.checked)} /> Hide overheated</label>
         <label className="flex items-center gap-2 text-xs text-slate-300 sm:text-sm"><input type="checkbox" checked={earlyOnly} onChange={(event) => setEarlyOnly(event.target.checked)} /> Early pump only</label>
         <button type="button" onClick={resetFilters} className="rounded-md border border-cyan-400/30 px-3 py-2 text-sm text-cyan-200 hover:bg-cyan-500/10">Reset Filter</button>
@@ -163,7 +165,11 @@ const Overview = () => {
               <div className="rounded bg-white/5 p-2"><div className="text-slate-500">RSI</div><div className="mt-1 text-slate-200">{number(ticker.rsi15m)}</div></div>
               <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Spike</div><div className="mt-1">{percent(ticker.volumeSpikePct)}</div></div>
               <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Rel Vol</div><div className="mt-1 text-slate-200">{number(ticker.relativeVolume)}x</div></div>
-              <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Upside</div><div className="mt-1 text-emerald-300">+{number(ticker.estimatedUpsideHighPct)}%</div></div>
+              <div className="rounded bg-white/5 p-2"><div className="text-slate-500">MACD</div><div className={ticker.macd.trend === 'BULLISH' ? 'mt-1 text-emerald-300' : ticker.macd.trend === 'BEARISH' ? 'mt-1 text-rose-300' : 'mt-1 text-slate-200'}>{ticker.macd.trend}</div></div>
+              <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Order Book</div><div className={ticker.orderBook.pressure === 'BUY' ? 'mt-1 text-emerald-300' : ticker.orderBook.pressure === 'SELL' ? 'mt-1 text-rose-300' : 'mt-1 text-slate-200'}>{number(ticker.orderBook.imbalancePct)}%</div></div>
+              <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Action</div><div className={`mt-1 ${actionTone(ticker.pumpProjection.action)}`}>{actionText(ticker.pumpProjection.action)}</div></div>
+              <div className="rounded bg-white/5 p-2"><div className="text-slate-500">Entry USDT / IDR</div><div className="mt-1 text-slate-200">{ticker.pumpProjection.entryLow ? `${price(ticker.pumpProjection.entryLow)}–${price(ticker.pumpProjection.entryHigh || ticker.pumpProjection.entryLow)}` : '-'}</div><div className="mt-1 text-[0.65rem] text-slate-500">{ticker.pumpProjection.entryLow && data?.idrRate ? `${rupiah(ticker.pumpProjection.entryLow, data.idrRate)}–${rupiah(ticker.pumpProjection.entryHigh || ticker.pumpProjection.entryLow, data.idrRate)}` : 'Rp N/A'}</div></div>
+              <div className="rounded bg-white/5 p-2"><div className="text-slate-500">TP1 USDT / IDR</div><div className="mt-1 text-emerald-300">{price(ticker.pumpProjection.takeProfit1)}</div><div className="mt-1 text-[0.65rem] text-slate-500">{rupiah(ticker.pumpProjection.takeProfit1, data?.idrRate)}</div></div>
             </div>
             <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
               <button onClick={() => navigate(`/coin/${ticker.symbol}`)} className="rounded-md bg-cyan-500 px-3 py-2.5 text-sm font-semibold text-slate-950">Buka Detail</button>
@@ -171,21 +177,33 @@ const Overview = () => {
             </div>
           </article>)}
         </div>
-        <table className="hidden min-w-[2400px] text-left text-xs text-slate-300 md:table">
+        <table className="hidden min-w-[1500px] text-left text-xs text-slate-300 md:table">
           <thead className="bg-slate-950 text-slate-400"><tr>
-            {['Rank', 'Symbol', 'Last Price', '5m', '15m', '1h', '24h', 'Vol 15m', 'Vol 1h', 'Vol 24h', 'Spike', 'Rel Vol', 'RSI 15m', 'MA10', 'MA30', 'Dist MA10', 'S1', 'S2', 'R1', 'R2', 'Est. Upside', 'Score', 'Signal', 'Action'].map((label) => <th key={label} className="whitespace-nowrap px-3 py-3">{label}</th>)}
+            {['Rank', 'Pair', 'Price', '15m', '24h', 'Spike', 'RSI', 'Trend', 'OB', 'Score', 'Signal', 'Plan', 'TP/SL', 'Action'].map((label) => <th key={label} className="whitespace-nowrap px-2.5 py-3">{label}</th>)}
           </tr></thead>
           <tbody>
             {paginated.map((ticker, index) => <tr key={ticker.symbol} className="border-t border-white/5 hover:bg-white/5">
-              <td className="px-3 py-3">{(currentPage - 1) * PAGE_SIZE + index + 1}</td><td className="px-3 py-3 font-semibold"><Link to={`/coin/${ticker.symbol}`} className="text-white hover:text-cyan-200">{ticker.symbol}</Link></td><td className="px-3 py-3"><div>{price(ticker.price)} USDT</div><div className="mt-1 text-[0.65rem] text-slate-500">{rupiah(ticker.price, data?.idrRate)}</div></td>
-              <td className="px-3 py-3">{percent(ticker.priceChange5m)}</td><td className="px-3 py-3">{percent(ticker.priceChange15m)}</td><td className="px-3 py-3">{percent(ticker.priceChange1h)}</td><td className="px-3 py-3">{percent(ticker.priceChange24h)}</td>
-              <td className="px-3 py-3">{number(ticker.volume15m)}</td><td className="px-3 py-3">{number(ticker.volume1h)}</td><td className="px-3 py-3">{number(ticker.volume24h)}</td>
-              <td className="px-3 py-3">{percent(ticker.volumeSpikePct)}</td><td className="px-3 py-3">{number(ticker.relativeVolume)}x</td><td className="px-3 py-3">{number(ticker.rsi15m)}</td>
-              <td className="px-3 py-3">{price(ticker.ma10)}</td><td className="px-3 py-3">{price(ticker.ma30)}</td><td className="px-3 py-3">{percent(ticker.distanceFromMa10Pct)}</td>
-              <td className="px-3 py-3">{price(ticker.support1)}</td><td className="px-3 py-3">{price(ticker.support2)}</td><td className="px-3 py-3">{price(ticker.resistance1)}</td><td className="px-3 py-3">{price(ticker.resistance2)}</td>
-              <td className="px-3 py-3 text-emerald-300">+{number(ticker.estimatedUpsideLowPct)}% - +{number(ticker.estimatedUpsideHighPct)}%</td>
-              <td className="px-3 py-3 font-semibold text-white">{ticker.score}</td><td className="px-3 py-3"><SignalBadge signal={ticker.signal} /></td>
-              <td className="px-3 py-3"><div className="flex gap-2"><button onClick={() => navigate(`/coin/${ticker.symbol}`)} className="rounded bg-cyan-500/15 px-2 py-1 text-cyan-200">Detail</button><button onClick={() => saveWatchlist(ticker)} className="rounded bg-white/10 px-2 py-1">+</button></div></td>
+              <td className="px-2.5 py-3">{(currentPage - 1) * PAGE_SIZE + index + 1}</td>
+              <td className="px-2.5 py-3 font-semibold"><Link to={`/coin/${ticker.symbol}`} className="text-white hover:text-cyan-200">{ticker.symbol}</Link></td>
+              <td className="px-2.5 py-3"><div>{price(ticker.price)} USDT</div><div className="mt-1 text-[0.65rem] text-slate-500">{rupiah(ticker.price, data?.idrRate)}</div></td>
+              <td className="px-2.5 py-3">{percent(ticker.priceChange15m)}</td>
+              <td className="px-2.5 py-3">{percent(ticker.priceChange24h)}</td>
+              <td className="px-2.5 py-3">{percent(ticker.volumeSpikePct)}</td>
+              <td className="px-2.5 py-3">{number(ticker.rsi15m)}</td>
+              <td className={`px-2.5 py-3 ${ticker.macd.trend === 'BULLISH' ? 'text-emerald-300' : ticker.macd.trend === 'BEARISH' ? 'text-rose-300' : 'text-slate-300'}`}>{ticker.macd.trend}</td>
+              <td className={`px-2.5 py-3 ${ticker.orderBook.pressure === 'BUY' ? 'text-emerald-300' : ticker.orderBook.pressure === 'SELL' ? 'text-rose-300' : 'text-slate-300'}`}>
+                <div>{ticker.orderBook.pressure}</div>
+                <div className="mt-1 text-[0.65rem] text-slate-500">{number(ticker.orderBook.imbalancePct)}%</div>
+              </td>
+              <td className="px-2.5 py-3 font-semibold text-white">{ticker.score}</td>
+              <td className="px-2.5 py-3"><SignalBadge signal={ticker.signal} /></td>
+              <td className="px-2.5 py-3">
+                <div className={actionTone(ticker.pumpProjection.action)}>{actionText(ticker.pumpProjection.action)}</div>
+                <div className="mt-1 text-[0.65rem] text-slate-500">{ticker.pumpProjection.entryLow ? `${price(ticker.pumpProjection.entryLow)}-${price(ticker.pumpProjection.entryHigh || ticker.pumpProjection.entryLow)} USDT` : 'NO TRADE'}</div>
+                {ticker.pumpProjection.entryLow ? <div className="mt-1 text-[0.6rem] text-slate-500">{rupiah(ticker.pumpProjection.entryLow, data?.idrRate)}–{rupiah(ticker.pumpProjection.entryHigh || ticker.pumpProjection.entryLow, data?.idrRate)}</div> : null}
+              </td>
+              <td className="px-2.5 py-3"><div className="text-emerald-300">TP {price(ticker.pumpProjection.takeProfit1)} USDT</div><div className="text-[0.6rem] text-slate-500">{rupiah(ticker.pumpProjection.takeProfit1, data?.idrRate)}</div><div className="mt-1 text-rose-300">SL {price(ticker.pumpProjection.stopLoss)} USDT</div><div className="text-[0.6rem] text-slate-500">{rupiah(ticker.pumpProjection.stopLoss, data?.idrRate)}</div></td>
+              <td className="px-2.5 py-3"><div className="flex gap-2"><button onClick={() => navigate(`/coin/${ticker.symbol}`)} className="rounded bg-cyan-500/15 px-2 py-1 text-cyan-200">Detail</button><button onClick={() => saveWatchlist(ticker)} className="rounded bg-white/10 px-2 py-1">+</button></div></td>
             </tr>)}
           </tbody>
         </table>

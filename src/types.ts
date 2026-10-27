@@ -1,5 +1,7 @@
 export type ConnectionStatus = 'CONNECTED' | 'DISCONNECTED' | 'ERROR'
 export type SignalLabel = 'EARLY SETUP' | 'BUY WATCH' | 'STRONG BUY' | 'BREAKOUT' | 'PULLBACK' | 'WAIT' | 'OVERHEATED' | 'AVOID'
+export type WhaleBreakoutState = 'EARLY_WHALE_ALERT' | 'BREAKOUT_CONFIRMED' | 'FAILED_BREAKOUT' | 'DISTRIBUTION_ALERT' | 'SIGNAL_INVALIDATED' | 'WAIT'
+export type WhaleCategory = 'not-convincing' | 'activity-rising' | 'possible-accumulation' | 'strong-whale-activity'
 
 export interface Candle {
   openTime: number
@@ -23,6 +25,65 @@ export interface EntryPlan {
   stopLoss: number
 }
 
+export interface MacdAnalysis {
+  line: number
+  signal: number
+  histogram: number
+  previousHistogram: number
+  trend: 'BULLISH' | 'BEARISH' | 'NEUTRAL'
+  crossover: 'BULLISH' | 'BEARISH' | 'NONE'
+}
+
+export interface OrderBookAnalysis {
+  bidNotional: number
+  askNotional: number
+  bidAskRatio: number
+  imbalancePct: number
+  nearestBidWallPrice: number | null
+  nearestBidWallDistancePct: number | null
+  nearestAskWallPrice: number | null
+  nearestAskWallDistancePct: number | null
+  pressure: 'BUY' | 'SELL' | 'BALANCED'
+}
+
+export interface PumpProjection {
+  basePrice: number
+  technicalTarget: number
+  stretchTarget: number
+  upsideToTechnicalPct: number
+  upsideToStretchPct: number
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW'
+  label: 'BREAKOUT TARGET' | 'RECLAIM TARGET' | 'WAIT CONFIRMATION'
+  action: 'ENTER_NOW' | 'WAIT_PULLBACK' | 'WAIT_BREAKOUT' | 'AVOID'
+  entryType: 'MARKET_CONFIRMATION' | 'PULLBACK' | 'BREAKOUT' | 'NO_TRADE'
+  entryLow: number | null
+  entryHigh: number | null
+  triggerPrice: number | null
+  invalidationPrice: number
+  stopLoss: number
+  takeProfit1: number
+  takeProfit2: number
+  takeProfit3: number | null
+  riskRewardToTp1: number | null
+  entryNote: string
+  takeProfitNote: string
+  reasons: string[]
+}
+
+export interface WhaleAnalysis {
+  whaleScore: number
+  category: WhaleCategory
+  breakoutState: WhaleBreakoutState
+  largeTradeActivity: number
+  volumeSpikeRatio: number
+  tradeImbalance: number
+  orderBookImbalance: number
+  netTakerFlow: number
+  consistency: number
+  dataQuality: number
+  reasons: string[]
+}
+
 export interface MarketTicker {
   symbol: string
   price: number
@@ -39,6 +100,8 @@ export interface MarketTicker {
   ma10: number
   ma30: number
   distanceFromMa10Pct: number
+  macd: MacdAnalysis
+  orderBook: OrderBookAnalysis
   support1: number
   support2: number
   resistance1: number
@@ -51,9 +114,11 @@ export interface MarketTicker {
   entry: EntryPlan
   estimatedUpsideLowPct: number
   estimatedUpsideHighPct: number
+  pumpProjection: PumpProjection
   openInterest: number | null
   candles: Candle[]
   updatedAt: string
+  whale: WhaleAnalysis
 }
 
 export interface SignalHistoryRecord {
@@ -116,6 +181,58 @@ export interface ScanResponse {
   idrRate: number | null
   idrRateUpdatedAt: string | null
   idrRateSource: 'CoinGecko' | null
+}
+
+export interface OnchainTrade {
+  chain: string
+  transactionHash: string
+  timestamp: number
+  tokenAddress: string
+  tokenId: string
+  tokenSymbol?: string
+  traderAddress?: string
+  side: 'buy' | 'sell' | 'unknown'
+  tokenAmount?: number
+  usdValue: number | null
+  source: 'bitquery'
+  confirmationStatus: 'confirmed' | 'provisional' | 'unknown'
+  dex?: string
+}
+
+export interface OnchainSummary {
+  tokenKey: string
+  chain: string
+  tokenAddress: string
+  tokenId: string
+  tokenSymbol: string | null
+  lastTradeAt: number | null
+  dataFreshnessSeconds: number | null
+  dataComplete: boolean
+  score: number | null
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW' | 'INCOMPLETE'
+  labels: string[]
+  windows: Record<'1m' | '5m' | '15m', { buyUsd: number; sellUsd: number; netBuyUsd: number; largeBuys: number; largeSells: number; uniqueBuyers: number; largestTradeUsd: number | null; volumeSpikeRatio: number | null }>
+  repeatedBuyerCount: number
+  observedBuyerConcentrationPct: number | null
+  components: Record<string, number | null>
+  reasons: string[]
+}
+
+export interface OnchainDashboard {
+  status: {
+    enabled: boolean
+    configured: boolean
+    provider: string
+    state: 'DISABLED' | 'NOT_CONFIGURED' | 'CONNECTING' | 'CONNECTED' | 'ERROR'
+    chains: string[]
+    lastMessageAt: number | null
+    lastError: string | null
+    subscriptionCount: number
+  }
+  config: { minTradeUsd: number; windowSeconds: number; alertThreshold: number; staleAfterSeconds: number }
+  summaries: OnchainSummary[]
+  recentTrades: OnchainTrade[]
+  alerts: Array<{ key: string; type: string; createdAt: number; summary: OnchainSummary }>
 }
 
 export interface TelegramSettings {
