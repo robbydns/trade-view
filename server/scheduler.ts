@@ -5,14 +5,14 @@ import { sendTelegramAlert } from './alert.js'
 import { getIdrRate } from './rates.js'
 import { store } from './store.js'
 import { buildTwentyPercentRadar } from './social.js'
-import { getOnchainAlertHistory, getOnchainConfig, getOnchainRecentTrades, getOnchainStatus, getOnchainSummaries, onOnchainAlert, startOnchainMonitoring, stopOnchainMonitoring } from './onchain/service.js'
+import { getOnchainAlertHistory, getOnchainConfig, getOnchainRecentTrades, getOnchainStatus, getOnchainSummaries, startOnchainMonitoring, stopOnchainMonitoring } from './onchain/service.js'
+import { meetsStrongBuyTelegramPolicy } from './telegram-alert-policy.js'
 
 const binance = new BinanceRealtimeService()
 const cooldownBySymbol = new Map<string, number>()
 const watchlistFile = new URL('./watchlist.json', import.meta.url)
 let lastSnapshotAt = 0
 let scanTimer: NodeJS.Timeout | null = null
-let removeOnchainAlertListener: (() => void) | null = null
 
 const loadWatchlist = () => {
   try {
@@ -160,11 +160,14 @@ const persistQualifiedSignals = async (tickers: MarketTicker[]) => {
     if (existing) continue
     const record: SignalHistoryRecord = { id: id(), symbol: ticker.symbol, priceAtAlert: ticker.price, currentPrice: ticker.price, gainLossPct: 0, score: ticker.score, rsi: ticker.rsi15m, volSpike: ticker.volumeSpikePct, relVol: ticker.relativeVolume, openInterest: ticker.openInterest, signal: ticker.signal, timestamp: new Date().toISOString(), telegramSent: false, status: 'ACTIVE', gain1hPct: null, gain4hPct: null, gain24hPct: null, maxGain4hPct: null, maxDrawdown4hPct: null }
     store.addSignal(record)
-    await sendLoggedTelegram(ticker, record.id, alertMode)
+    if (hasTradableRisk(ticker) && meetsStrongBuyTelegramPolicy(ticker)) {
+      await sendLoggedTelegram(ticker, record.id)
+    }
   }
 }
 
-const sendLoggedTelegram = async (ticker: MarketTicker, historyId?: string, alertMode: AlertMode = getAlertMode(ticker)) => {
+const sendLoggedTelegram = async (ticker: MarketTicker, historyId?: string) => {
+  if (!hasTradableRisk(ticker) || !meetsStrongBuyTelegramPolicy(ticker)) return
   const now = Date.now()
   const lastPersistedSent = store.get().telegramLogs.find((record) => record.symbol === ticker.symbol && record.status === 'SENT')
   const lastSentAt = Math.max(cooldownBySymbol.get(ticker.symbol) || 0, lastPersistedSent ? Date.parse(lastPersistedSent.timestamp) : 0)
@@ -173,7 +176,7 @@ const sendLoggedTelegram = async (ticker: MarketTicker, historyId?: string, aler
     return
   }
   try {
-    const telegramResponse = await sendTelegramAlert(formatTelegramAlert(ticker, alertMode), true)
+    const telegramResponse = await sendTelegramAlert(formatTelegramAlert(ticker), true)
     cooldownBySymbol.set(ticker.symbol, now)
     addTelegramLog(ticker, 'SENT', telegramResponse)
     store.mutate((draft) => {
@@ -194,10 +197,10 @@ const sendLoggedTelegram = async (ticker: MarketTicker, historyId?: string, aler
 
 const addTelegramLog = (ticker: Pick<MarketTicker, 'symbol' | 'score' | 'signal'>, status: TelegramLogRecord['status'], message: string) => store.addTelegramLog({ id: id(), timestamp: new Date().toISOString(), symbol: ticker.symbol, score: ticker.score, signal: ticker.signal, status, response: message })
 
-const formatTelegramAlert = (ticker: MarketTicker, alertMode: AlertMode) => `Crypto Signal Alert
+const formatTelegramAlert = (ticker: MarketTicker) => `Crypto Signal Alert
 
 Coin: ${ticker.symbol}
-Mode: ${alertMode}
+Mode: STRONG_BUY
 Signal: ${ticker.signal}
 Score: ${ticker.score}
 Whale Score: ${ticker.whale.whaleScore} (${ticker.whale.category})
@@ -221,13 +224,6 @@ Disclaimer: Bukan nasihat finansial.`
 
 export const initializeScheduler = async () => {
   binance.start()
-  if (!removeOnchainAlertListener) {
-    removeOnchainAlertListener = onOnchainAlert(({ type, summary }) => {
-      const window = summary.windows['15m']
-      const message = `On-chain ${type}\n\nChain: ${summary.chain}\nToken: ${summary.tokenSymbol || 'Unknown'}\nAddress: ${summary.tokenAddress}\nBuy 15m: $${window.buyUsd.toLocaleString('en-US')}\nSell 15m: $${window.sellUsd.toLocaleString('en-US')}\nNet flow 15m: $${window.netBuyUsd.toLocaleString('en-US')}\nObserved buyers: ${window.uniqueBuyers}\nOn-chain score: ${summary.score ?? 'INCOMPLETE'} / 100\nConfidence: ${summary.confidence}\nFreshness: ${summary.dataFreshnessSeconds ?? 'unknown'}s\nReasons: ${summary.reasons.join(' | ')}\n\nDEX trade feed; not a buy recommendation.`
-      void sendTelegramAlert(message, true).catch(() => console.warn('On-chain alert delivery failed; check Telegram configuration.'))
-    })
-  }
   startOnchainMonitoring()
   await refresh()
   if (scanTimer) clearInterval(scanTimer)
@@ -237,8 +233,6 @@ export const initializeScheduler = async () => {
 export const stopScheduler = () => {
   if (scanTimer) clearInterval(scanTimer)
   scanTimer = null
-  removeOnchainAlertListener?.()
-  removeOnchainAlertListener = null
   stopOnchainMonitoring()
 }
 

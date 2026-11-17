@@ -27,6 +27,10 @@ Backend: `http://localhost:4000`
 
 Coin Detail now loads Binance closed candles for 1m, 15m, 1h, and 1d and uses a shared indicator engine for RSI (Wilder), EMA 9/21/50, SMA 20/50, MACD 12/26/9, quote-volume ratio, ATR, support/resistance, entry, stop, TP1/TP2, and risk/reward. The display also converts USDT estimates to IDR using the existing CoinGecko USDT/IDR reference rate. A timeframe with incomplete/unavailable data is clearly marked; incomplete timeframe coverage cannot produce a strong consensus. 1m is used for entry timing, while a strong consensus requires aligned closed-candle evidence from 15m, 1h, and 1d. The overall Binance scanner score is still separately based on the existing 15m signal with higher-timeframe trend confirmation; the detail-page consensus is an additional analysis, not a rewrite of the scanner's CEX score. Signals are analytical filters and never guarantee outcomes.
 
+## Telegram alert policy
+
+Automatic Telegram trading notifications are restricted to `STRONG BUY` only and must additionally pass the existing market-liquidity/risk checks, not be overheated, have a HIGH-confidence projection, avoid an `AVOID` action, and have projected TP1 reward/risk of at least 1.5:1. Early ignition, breakout-watch, pullback-reentry, and on-chain-only events remain visible in dashboard/history but do not trigger Telegram messages. The manual Telegram test button still sends its explicit test message. A strong signal is not a guarantee that price will rise; use the posted entry/stop/targets as analysis, not certainty.
+
 ## Optional on-chain DEX whale monitor
 
 The Wallet Inflow view uses Bitquery's documented GraphQL v2 `Trading.Trades` stream, not sample/demo wallet records. The adapter normalizes chain, token ID/address, swap side, trader address, transaction hash, quote/USD amount, pool, and timestamp. Normal token transfers are not treated as buys or sells. DEX/AMM protocol-family rows are required; unknown directions and missing USD prices are not included in directional totals.
